@@ -13,7 +13,7 @@ The advantages of the chatbot API:
 The disadvantages of the chatbot API:
  - It uses your CPU and it is quite slow (30-200 sec per request), as a result, especially, when you use RAG and want to query or chat with your data. You can further develop this project to use GPU instead of CPU to boost the chatbot's performance. However, keep in mind that you will need to have the means for that (a powerful NVIDIA graphics card).
 ## Project infrastructure:
-
+![image](https://github.com/PolarBearPolar/ai_chatbot/assets/88388315/97d4e0aa-9d3f-4a73-91a9-279fc4287e16)
 ## Instructions:
 - Make sure you have Docker installed
 - Make sure port **8000** is not used on your local machine
