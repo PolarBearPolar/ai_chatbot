@@ -1,0 +1,8 @@
+vector_database/
+chatbot/chat_database/*
+!chatbot/chat_database/.gitkeep
+chatbot/data/*
+!chatbot/data/llama_luna.txt
+chatbot/log.log
+chatbot/__pycache__/
+chatbot/.venv/

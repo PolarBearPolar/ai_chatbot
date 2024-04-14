@@ -1,0 +1,69 @@
+version: '3.4'
+services:
+
+  chatbot:
+    image: chatbot:1.0
+    build: 
+      context: ./chatbot
+      no_cache: true
+      args:
+        OLLAMA_MODEL: 'llama2:7b'
+        OLLAMA_PORT: 11434
+        VECTOR_DATABASE_PORT: 8080
+    container_name: chatbot
+    ports:
+      - 8000:8000
+    volumes:
+      - ./chatbot:/chatbot
+    restart: unless-stopped
+    depends_on:
+      - ollama
+      - vector_database
+    networks:
+      - net
+      
+  ollama:
+    image: ollama:1.0
+    build: 
+      context: ./ollama
+      no_cache: true
+      args:
+        OLLAMA_MODEL: 'llama2:7b'
+    container_name: ollama
+    ports:
+      - 11435:11434
+    tty: true
+    restart: unless-stopped
+    networks:
+      - net
+      
+  vector_database:
+    command:
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8080'
+    - --scheme
+    - http
+    image: cr.weaviate.io/semitechnologies/weaviate:1.24.1
+    container_name: vector_database
+    ports:
+    - 8080:8080
+    - 50051:50051
+    volumes:
+    - ./vector_database:/var/lib/weaviate
+    restart: on-failure:0
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_MODULES: 'text2vec-cohere,text2vec-huggingface,text2vec-palm,text2vec-openai,generative-openai,generative-cohere,generative-palm,ref2vec-centroid,reranker-cohere,qna-openai'
+      CLUSTER_HOSTNAME: 'node1'
+    networks:
+      - net
+
+networks:
+  net:
+    name: net
+    external: false
