@@ -9,11 +9,11 @@ The advantages of the chatbot API:
  - You can ask questions related to your data (txt or pdf) and even chat with it. The chatbot can use Retrieval-Augmented Generation (RAG). RAG allows LLMs to use external information when generating answers to your queries. 'External', in this context, means the information that an LLM is not familar with and has not been trained on. In our case, this 'external' information is our own data in txt or pdf format. You will have an understanding of how it works in the example provided below.
  - Data is persisted:
  	- your data is processed (transformed into numerical vectors) and stored in a Weaviate vector database
- 	- chat history is stored in an SQLite database
+ 	- chat history is stored in an SQLite database.
 The disadvantages of the chatbot API:
  - It uses your CPU and it is quite slow (30-200 sec per request), as a result, especially, when you use RAG and want to query or chat with your data. You can further develop this project to use GPU instead of CPU to boost the chatbot's performance. However, keep in mind that you will need to have the means for that (a powerful NVIDIA graphics card).
-## Project infrastructure:
-![image](https://github.com/PolarBearPolar/ai_chatbot/assets/88388315/97d4e0aa-9d3f-4a73-91a9-279fc4287e16)
+## Project architecture:
+![image](https://github.com/PolarBearPolar/ai_chatbot/assets/88388315/32941b9e-83e0-4d05-a5fb-6d9045ed97bd)
 ## Instructions:
 - Make sure you have Docker installed
 - Make sure port **8000** is not used on your local machine
