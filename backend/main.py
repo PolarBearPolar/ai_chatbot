@@ -1,16 +1,29 @@
+import constants
+import requests
+import logging
 from uvicorn import Config, Server
 from fastapi import FastAPI, Depends, HTTPException
 from sqlmodel import Session, select
-from model import ChatElement, User
+from model import ChatElement, User, QueryResponseElement
 from database import getSession
 from sqlalchemy import delete, and_, func
-import time
+from typing import Optional
+
+# Set up logging
+logging.basicConfig(
+	level=constants.LOG_LEVEL,
+	format=constants.LOG_FORMAT,
+	handlers=[
+		logging.FileHandler(constants.LOG_FILE, mode="a")
+	]
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 uvicornConfig = Config(
     app, 
-    host="http://127.0.0.1",
-    port="8000",
+    host=constants.API_HOST,
+    port=constants.API_PORT,
     log_level = "info",
     reload=True
 )
@@ -58,24 +71,37 @@ def updateUser(userId: str, user: User, session: Session=Depends(getSession)):
     return dbUser
 
 # Create new chat query and response to it
-@app.post("/query/", response_model=list[ChatElement])
+@app.post("/query/", response_model=Optional[ChatElement])
 def createChatElements(chatElement: ChatElement, session: Session=Depends(getSession)):
+    # Get chat history
+    chatHistoryStatement = select(ChatElement).where(and_(ChatElement.user_id == chatElement.user_id, ChatElement.chat_id == chatElement.chat_id))
+    chatHistory = [ChatElement(**element.model_dump()) for element in session.exec(chatHistoryStatement).all()]
+    # Save query chat element to database
     session.add(chatElement)
     session.commit()
     session.refresh(chatElement)
-    time.sleep(5)
-    responseChatElement = ChatElement(
-        chat_id=chatElement.chat_id,
-        chat_role="ASSISTANT",
-        chat_message=f"echo: {chatElement.chat_message}",
-        user_id=chatElement.user_id
+    # Build query object
+    query = QueryResponseElement(
+        is_rag_used=constants.IS_RAG_USED,
+        query=chatElement,
+        chat_history=chatHistory
     )
-    session.add(responseChatElement)
-    session.commit()
-    session.refresh(responseChatElement)
-    statement = select(ChatElement).where(and_(ChatElement.user_id == chatElement.user_id, ChatElement.chat_id == chatElement.chat_id))
-    results = session.exec(statement).all()
-    return results
+    logger.info(f"A new query has been subitted: {query.query.chat_message}")
+    # Send query object to chatbot component to get response
+    queryRequest = requests.post(
+        f"{constants.CHATBOT_URL}/query",
+        data = query.model_dump_json(),
+        timeout=constants.CHATBOT_REQUEST_TIMEOUT
+    )
+    # Save response to database
+    if queryRequest.status_code == 200 and queryRequest.json().get("response", None) is not None:
+        responseChatElement = ChatElement(**queryRequest.json()["response"])
+        logger.info(f"The response to the query is as follows: {responseChatElement.response.chat_message}")
+        session.add(responseChatElement)
+        session.commit()
+        session.refresh(responseChatElement)
+        return responseChatElement
+    return None
 
 # Get all chat elements of one chat for specific user (when userId and chatElementId are specified)
 # Get distinct chats of user (when only userId is specified)

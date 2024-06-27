@@ -1,18 +1,19 @@
 version: '3.4'
 services:
 
+
   chatbot:
     image: chatbot:1.0
     build: 
       context: ./chatbot
       no_cache: true
       args:
-        OLLAMA_MODEL: 'llama2:7b'
+        OLLAMA_MODEL: 'psychological-assistant-model'
         OLLAMA_PORT: 11434
         VECTOR_DATABASE_PORT: 8080
     container_name: chatbot
     ports:
-      - 8000:8000
+      - 8001:8001
     volumes:
       - ./chatbot:/chatbot
     restart: unless-stopped
@@ -21,22 +22,100 @@ services:
       - vector_database
     networks:
       - net
-      
+
+
+  backend:
+    image: backend:1.0
+    build: 
+      context: ./backend
+      no_cache: true
+      args:
+        POSTGRES_USER: admin
+        POSTGRES_PASSWORD: admin
+        POSTGRES_DB: chatbot
+        POSTGRES_PORT: 5432
+        CHATBOT_PORT: 8001
+        IS_RAG_USED: false
+    container_name: backend
+    ports:
+      - 8000:8000
+    volumes:
+      - ./backend:/backend
+    restart: unless-stopped
+    depends_on:
+      - chatbot
+      - database
+    networks:
+      - net
+
+
+  frontend:
+    image: frontend:1.0
+    build: 
+      context: ./frontend
+      no_cache: true
+      args:
+        BACKEND_PORT: 8000
+    container_name: frontend
+    ports:
+      - 8501:8501
+    volumes:
+      - ./frontend:/frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - net
+
+ 
   ollama:
     image: ollama:1.0
     build: 
       context: ./ollama
       no_cache: true
       args:
-        OLLAMA_MODEL: 'llama2:7b'
-    container_name: ollama
+        OLLAMA_MODEL: 'llama2:7b' #'llama3:8b'
+    deploy:
+      replicas: 1
     ports:
       - 11435:11434
     tty: true
     restart: unless-stopped
     networks:
       - net
-      
+
+   
+  nginx:
+    image: nginx:1.25.5-alpine
+    container_name: nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - 80:80
+    depends_on:
+      - ollama
+    restart: unless-stopped
+    networks:
+      - net
+
+   
+  database:
+    image: postgres:12-alpine
+    container_name: database
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=chatbot
+    volumes:
+      - ./database/database:/var/lib/postgresql/data
+      - ./database/initdb.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - 5432:5432
+    restart: unless-stopped
+    networks:
+      - net
+
+   
   vector_database:
     command:
     - --host
@@ -63,7 +142,7 @@ services:
     networks:
       - net
 
+
 networks:
   net:
     name: net
-    external: false

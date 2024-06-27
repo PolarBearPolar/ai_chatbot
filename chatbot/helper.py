@@ -5,7 +5,6 @@ from llama_index.core import Settings
 from llama_index.embeddings.langchain import LangchainEmbedding
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from config import Config
-from chat_history import ChatHistory
 
 
 def getLlm() -> Ollama:
@@ -31,11 +30,6 @@ def configureSettings() -> "Settings":
     Settings.chunk_size = Config.EMBEDDING_CHUNK_SIZE
     Settings.chunk_overlap = Config.EMBEDDING_CHUNK_OVERLAP
     return Settings
-
-
-def getChatHistory() -> ChatHistory:
-    chatHistory = ChatHistory(chatDbPath=Config.CHAT_HISTORY_DATABASE)
-    return chatHistory
 
 
 def createWeaviateClient() -> weaviate.Client:

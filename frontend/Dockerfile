@@ -1,16 +1,12 @@
 FROM ubuntu:22.04
 
-EXPOSE 8001
+EXPOSE 8000
 
-ARG OLLAMA_MODEL
-ARG OLLAMA_PORT
-ARG VECTOR_DATABASE_PORT
-ENV OLLAMA_MODEL=$OLLAMA_MODEL
-ENV OLLAMA_PORT=$OLLAMA_PORT
-ENV VECTOR_DATABASE_PORT=$VECTOR_DATABASE_PORT
+ARG BACKEND_PORT
+ENV BACKEND_PORT=$BACKEND_PORT
 
-RUN mkdir chatbot
-WORKDIR ./chatbot
+RUN mkdir frontend
+WORKDIR ./frontend
 
 COPY ./requirements.txt .
 
@@ -23,4 +19,4 @@ RUN apt-get update && \
 RUN pip3 install --upgrade pip
 RUN pip3 install -r requirements.txt
 
-ENTRYPOINT ["./run_chatbot.sh"]
+ENTRYPOINT ["./run_frontend.sh"]

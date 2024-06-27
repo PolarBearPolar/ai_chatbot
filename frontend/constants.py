@@ -1,6 +1,13 @@
-BACKEND_BASE_URL = "http://127.0.0.1:8000"
+import os
+import logging
+
+BACKEND_BASE_URL = f"http://backend:{os.environ.get('BACKEND_PORT')}"
 BACKEND_USER_ENDPOINT = "user"
 BACKEND_QUERY_ENDPOINT = "query"
+BACKEND_REQUEST_TIMEOUT = 20000
+LOG_LEVEL = logging.INFO
+LOG_FORMAT = "%(asctime)s - %(name)s - %(message)s"
+LOG_FILE = "log.log"
 ROLE_ASSISTANT = "ASSISTANT"
 ROLE_USER = "USER"
 CHAT_NEWLINE_CHARACTER = "  \n"

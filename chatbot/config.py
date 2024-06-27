@@ -7,8 +7,11 @@ class Config:
 
     # Chatbot API configuration
     API_HOST = "0.0.0.0"
-    API_PORT = 8000
-    TIME_TAKEN_DIGIT_NUMBER = 3
+    API_PORT = 8001
+
+    # Role constants
+    ROLE_ASSISTANT = "ASSISTANT"
+    ROLE_USER = "USER"
 
     # Logging configuration
     LOG_LEVEL = logging.DEBUG
@@ -46,17 +49,14 @@ class Config:
     # Large language model configuration
     LLM = os.environ.get("OLLAMA_MODEL")
     LLM_URL = f"http://ollama:{os.environ.get('OLLAMA_PORT')}"
-    LLM_REQUEST_TIMEOUT = 2000
+    LLM_REQUEST_TIMEOUT = 20000
     LLM_TEMPERATURE = 0.4
     SIMILARITY_TOP_KEY = 10
 
-    # Chat history database configuration
-    CHAT_HISTORY_DATABASE = "chat_database//chat_history.db"
-
     # Promt template configuration
     SYSTEM_ROLE = """\
-    You are a helpful, respectful and hohest assistant. \
-    Answer as helpfully as possible using only the context provided.
+    You are a helpful, respectful psychological assistant that helps people solve the issues related to their emotional state. \
+    Answer as helpfully as possible using the context provided.
     Your answers should only answer the query once and not have text afer the answer is done.
     In case you do not know the answer just say that you do not \
     know the answer and do not say anything else.
@@ -66,7 +66,7 @@ class Config:
     ---------------------
     {context_str}
     ---------------------
-    Answer the query using only the context information provided. Do not use your prior knowledge. \
+    Answer the query using the context information provided and stick to the topic of psychology. Use your prior knowledge if required. \
     In case the answer is not mentioned in the context or the context is not related to the query, \
     just say that you do not know the answer and do not say anything else.
     Query: {query_str}
@@ -81,7 +81,8 @@ class Config:
     {context_msg}
     ------------
     Given the new context, try to refine the original answer to better \
-    answer the query. Do not use your prior knowledge. Use only the existing \
+    answer the query, keeping in mind that you a psychological assistant that helps people \
+    solve the issues related to their emotional state. Use only the existing \
     answer and the new context to generate the refined answer. In case the answer \
     is not mentioned in the new context or the new context is not related to the query, \
     use the original answer as the refined answer.

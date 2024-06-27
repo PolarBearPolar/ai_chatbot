@@ -3,9 +3,20 @@ st.set_page_config(layout="wide", page_title="AI Psychological Assistant", page_
 import requests
 import time
 import constants
+import logging
 from model import User, ChatElement
 from urllib.parse import urljoin
 from typing import Generator
+
+# Set up logging
+logging.basicConfig(
+	level=constants.LOG_LEVEL,
+	format=constants.LOG_FORMAT,
+	handlers=[
+		logging.FileHandler(constants.LOG_FILE, mode="a")
+	]
+)
+logger = logging.getLogger(__name__)
 
 
 def initSessionState() -> None:
@@ -31,6 +42,7 @@ def authenticate() -> None:
         )
         if userRequest.status_code == 200:
             st.session_state.user = User(**userRequest.json())
+            logger.info(f"{st.session_state.user.username} is using application now...")
         elif userRequest.status_code == 404:
             user = User(
                 username=st.session_state.username, 
@@ -41,6 +53,7 @@ def authenticate() -> None:
                 data=user.model_dump_json()
             )
             st.session_state.user = User(**userPostRequest.json())
+            logger.info(f"{st.session_state.user.username} is using application now...")
 
 
 def updateUserState() -> None:
@@ -194,16 +207,17 @@ def processQuery(query: str=None) -> None:
     with st.spinner("Processing your query..."):
         chatElementPostRequest = requests.post(
             urljoin(constants.BACKEND_BASE_URL, constants.BACKEND_QUERY_ENDPOINT), 
-            data=chatElement.model_dump_json()
+            data=chatElement.model_dump_json(),
+            timeout=constants.BACKEND_REQUEST_TIMEOUT
         )
-    if chatElementPostRequest.status_code == 200:
+    if chatElementPostRequest.status_code == 200 and chatElementPostRequest.json() is not None:
         if not st.session_state.chat:
-            st.session_state.chat = ChatElement(**chatElementPostRequest.json()[0])
-        displayChatElement(constants.ROLE_ASSISTANT, chatElementPostRequest.json()[-1]["chat_message"], True)
+            st.session_state.chat = chatElement
+        displayChatElement(constants.ROLE_ASSISTANT, chatElementPostRequest.json()["chat_message"], True)
         st.session_state.messages.append(
             {
                 "role": constants.ROLE_ASSISTANT,
-                "content": chatElementPostRequest.json()[-1]["chat_message"]
+                "content": chatElementPostRequest.json()["chat_message"]
             }
         )
 

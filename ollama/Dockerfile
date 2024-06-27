@@ -11,9 +11,10 @@ RUN curl -fsSL https://ollama.com/install.sh|sh
 
 WORKDIR /home
 
-COPY pull_llm.sh .
+COPY create_custom_llm.sh .
+COPY Modelfile .
 
-RUN chmod +x pull_llm.sh
-RUN ./pull_llm.sh
+RUN chmod +x create_custom_llm.sh
+RUN ./create_custom_llm.sh
 
 ENTRYPOINT ["ollama", "serve"]
