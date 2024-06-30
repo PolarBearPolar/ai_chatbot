@@ -1,156 +1,38 @@
-# ai_chatbot
-## Introduction:
-The main idea of this project was to create a local chatbot API using an open-source large language model (LLM). You can think of it as having ChatGPT running locally on your machine. 
-
-The advantages of the chatbot API:
- - You can directly interact with an LLM in one of 2 modes
- 	- query mode: ask a question once, get an answer and do not ask follow-up questions
- 	- chat mode: ask one question to start a chat and continue communicating with the chatbot.
- - You can ask questions related to your data (txt or pdf) and even chat with it. The chatbot can use Retrieval-Augmented Generation (RAG). RAG allows LLMs to use external information when generating answers to your queries. 'External', in this context, means the information that an LLM is not familar with and has not been trained on. In our case, this 'external' information is our own data in txt or pdf format. You will have an understanding of how it works in the example provided below.
- - Data is persisted:
- 	- your data is processed (transformed into numerical vectors) and stored in a Weaviate vector database
- 	- chat history is stored in an SQLite database  
-The disadvantages of the chatbot API:
- - It uses your CPU and it is quite slow (30-200 sec per request), as a result, especially, when you use RAG and want to query or chat with your data. You can further develop this project to use GPU instead of CPU to boost the chatbot's performance. However, keep in mind that you will need to have the means for that (a powerful NVIDIA graphics card).
-## Project architecture:
-![image](https://github.com/PolarBearPolar/ai_chatbot/assets/88388315/32941b9e-83e0-4d05-a5fb-6d9045ed97bd)
-## Instructions:
-- Make sure you have Docker installed
-- Make sure port **8000** is not used on your local machine
+# AI Psychological Assistant 🤖
+## Introduction 
+This is an AI powered psychological assistant application. The assistant specilizes in managing stress, depression, anxiety, fear, and apathy.
+👉 The application is easy to navigate and use.
+👉 You can have multiple chats with the assistant and all of them will be stored (persisted) in a PostgreSQL database. In case you want to remove any chat from your chat history, you can do it by simply clicking the **Delete chat** button.
+👉 The project is split into multiple components/services. The service that is responsible for large language model (LLM) interaction allows to include external data (external for the LLM) when generating answers to your queries (it is called Retrieval-Augmented Generation (RAG)). 'External', in this context, means the information that the LLM is not familar with and has not been trained on. In our case, this 'external' information is the psychology-related data stored in txt format that I considered to be the most relevant to the topic of dealing with stress, depression, anxiety, fear, and apathy. This data will be called RAG data throughout this description.
+👉 RAG data is processed (transformed into numerical vectors) and stored/persisted in a Weaviate vector database.
+## User Interface Layout 🖼️
+Here is a basic description of the user interface of the application.
+![image](https://github.com/PolarBearPolar/ai_chatbot/assets/88388315/d896f639-089a-46cc-8f9a-4ecefca705d9)
+1. User information form
+2. Chat history. Click on the **New chat+** button to create a new chat with the assistant. Click on other chat buttons to switch between the chats you have already initiated with the assitant.
+3. A short description of the assistant. The description area contains the **Delete chat** button. It is active only when a chat is selected. If you click on it, the chat currently opened will be deleted.
+4. The chat area. Write your question/queries into the query bar and send them to the assistant to have a conversation.
+## Application Architecture Design 🛠️
+Here is the project architecture.
+![image](https://github.com/PolarBearPolar/ai_chatbot/assets/88388315/95e0f823-2187-4c5a-aec5-d546fbdc2f9f)
+## How to Use Application 🚀
+The initial idea of this project was to create a local chatbot API using an open-source large language model (LLM). However, due to insufficient resources, I had to use a 3rd party service to interact with the LLM. The LLM used in this project is the open-source LLM called Llama3 by Meta. So in order to use this model, go to [together.ai](https://www.together.ai/) and sign in. You will be given an API key. Copy it because you will need it later on.
+- Make sure you have Docker installed.
+- Make sure ports **8501**, **8000**, **8001**, **5432**, **8080** are not used on your local machine.
 - Clone the repository to any directory on your local machine
 - **cd** into the directory that contains the cloned repo in command line and run the following command there (Linux Docker command example)
+- Open the **docker-compose.yml** file and replace the *LLM_API_KEY: '\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*'* with *LLM_API_KEY: your api key that you copied*.
 ```
 sudo docker compose -f docker-compose.yml up
 ```
 - Wait until all the containers are up and running
-- You may start using the chatbot API
-
-The endpoint used to ask questions and chat with the chatbot is http://localhost:8000/query
-An example of a request JSON object that is used for sending request is provided below:
-```
-{
-  "isRagUsed": true,
-  "chatId": "string",
-  "query": "string"
-}
-```
-An example of a response JSON object that is received is provided below:
-```
-{
-  "isRagUsed": true,
-  "chatId": "string",
-  "query": "string",
-  "answer": "string",
-  "timeTaken": 0
-}
-```
-- **isRagUsed** - (**mandatory**) - a boolean value that shows whether RAG is enabled (*true* - include your data) or not (*false* - do not use your data) when generating responses
-- **chatId** - the id of a chat history instance
-- **query** - (**mandatory**) - the question or query
-- **answer** - the answer generated by the LLM
-- **timeTaken** - the time taken to generate the response
-
-In order to use RAG, you first need to place your data files in txt (preferred) or pdf format into the /chatbot/chatbot/data directory. Delete the example file llama_luna.txt from the directory or keep it if you want to test the chatbot without adding your data. Run the command below to ingest your data (to process it and save it to the vector database):
+- In order to use RAG data, go to the **./chatbot/data directory**. Keep the example files or replace them with your own files if you want to chat with your data files. Run the command below to ingest RAG data (to process it and save it to the vector database):
 ```
 sudo docker exec chatbot python3 ingest.py
 ```
-After you have run the command above, you can delete your txt or pdf files if you want to because their content will be stored in the vector database. If you have huge amounts of data, increase request timeout limit to 50000 sec.
-
-In order to send a query/question, send a request JSON object with a post request to the chatbot. 
- - Do not include the chatId element into the JSON object to use query mode.
- - Include the chatId element with the chatId value returned from a preceeding post request to use chat mode.
- 
-When chatbot is running, it outpus logs into the log.log file located in the /chatbot/chatbot/data directory.
-
-You have 2 additional commands at your disposal that you can run to manage the chatbot.
-
-This is the comand to delete/clear chat history completely:
-```
-sudo docker exec chatbot python3 clear_chat_history.py
-```
-This is the comand to delete your data from the vector database:
+- You may start using the application.
+If you ever need to delete your RAG data from the vector database, run the following command:
 ```
 sudo docker exec chatbot python3 clear_vector_db.py
 ```
-If you wish to configure the chatbot to your needs, you can start from changing the configurations in the /chatbot/chatbot/config.py file.
-## Testing examples:
-Sending a question to the chatbot about something it does not know, without using RAG.
-**request**:
-```
-curl -m 20000 -X POST -H "Content-Type: application/json" -d '{
-	"isRagUsed": false,
-	"query": "What do you know about a llama named Luna?"
-}' http://localhost:8000/query
-```
-**response**:
-```
-{
-	"isRagUsed":false,
-	"chatId":"aacaabae33904b7f82f8ba98ca7c13ce",
-	"query":"What do you know about a llama named Luna?",
-	"answer":" I'm just an AI, I don't have access to information about a specific llama named Luna. Llamas are domesticated animals that are native to South America, and they are known for their distinctive appearance, with their long necks, ears, and fur. However, I couldn't find any information about a particular llama named Luna. If you have any more details or context about this llama, please let me know!",
-	"timeTaken":38.105
-}
-```
-Sending a follow-up question to the chatbot to continue the conversation/chat, without using RAG.
-**request**:
-```
-curl -m 20000 -X POST -H "Content-Type: application/json" \
--d '{
-	"isRagUsed": false,
-	"chatId": "aacaabae33904b7f82f8ba98ca7c13ce",
-	"query": "What question was my last question?"
-}' \
-http://localhost:8000/query
-```
-**response**:
-```
-{
-	"isRagUsed":false,
-	"chatId":"aacaabae33904b7f82f8ba98ca7c13ce",
-	"query":"What question was my last question?",
-	"answer":" Your last question was: What do you know about a llama named Luna?",
-	"timeTaken":38.216
-}
-```
-Sending a question to the chatbot about your data with using RAG.
-**request**:
-```
-curl -m 20000 -X POST -H "Content-Type: application/json" \
--d '{
-	"isRagUsed": true,
-	"query": "What do you know about a llama named Luna?"
-}' \
-http://localhost:8000/query
-```
-**response**:
-```
-{
-	"isRagUsed":true,
-	"chatId":"6d434ed5e7cb45759b3297942ef8a3e7",
-	"query":"What do you know about a llama named Luna?",
-	"answer":"I'm Luna! *giggles* Hi there! *twinkle eyes* I know I'm a smart and curious llama who loves to learn and help others. *nuzzles nose* I've got a brilliant mind and a heart full of wonder, and I'm always eager to explore new ideas and make a difference in the world. *stamps hooves* Is there something else I can help you with?",
-	"timeTaken":204.375
-}
-```
-Sending a follow-up question to the chatbot with using RAG to continue the conversation/chat.
-**request**:
-```
-curl -m 20000 -X POST -H "Content-Type: application/json" \
--d '{
-	"isRagUsed": true,
-	"chatId": "6d434ed5e7cb45759b3297942ef8a3e7",
-	"query": "What made Luna so special?"
-}' \
-http://localhost:8000/query
-```
-**response**:
-```
-{
-	"isRagUsed":true,
-	"chatId":"6d434ed5e7cb45759b3297942ef8a3e7",
-	"query":"What made Luna so special?",
-	"answer":"Luna's intelligence and curiosity make her special. She is different from the other llamas in the herd who spend their days munching on grass and enjoying the sunlight. Luna has grand aspirations and a longing for something beyond the ordinary llama life. She spends her days observing the world around her, soaking up knowledge like a sponge. With her sharp mind and insatiable curiosity, she begins to study everything she can get her hooves on, from ancient texts to modern science. This leads her to develop an AI application unlike any the world had ever seen, powered by her own thinking power. The AI can answer any question thrown its way and engage in meaningful conversations with people from all walks of life. With their creation unleashed upon the world, Luna and her friends watch with pride as their AI touches the lives of countless individuals, providing knowledge, companionship, and even a few laughs along the way.",
-	"timeTaken":242.179
-}
-```
+If you wish to configure the chatbot component of this application to your needs, you can start from changing the configurations in the **docker-compose.yml** file or the **./chatbot/config.py** file. In case you want to use Ollama or OpenAI API, change the *getLlm()* method in the **./chatbot/helper.py** file accordingly.
