@@ -1,6 +1,5 @@
 vector_database/
 database/database/
-chatbot/data/
 chatbot/log.log
 chatbot/__pycache__/
 chatbot/.venv/
