@@ -1,6 +1,6 @@
 import helper
 import logging
-from llama_index.core import VectorStoreIndex, Settings
+from llama_index.core import VectorStoreIndex, Settings, ChatPromptTemplate
 from llama_index.core.chat_engine import CondenseQuestionChatEngine
 from llama_index.vector_stores.weaviate import WeaviateVectorStore
 from llama_index.core.llms import ChatMessage, MessageRole
@@ -22,6 +22,9 @@ def retrieveResponse(query: QueryResponseElement) -> None:
 
 
 def retrieveResponseWithRag(query: QueryResponseElement)-> None:
+    if isVectorDbEmpty():
+        retrieveResponseWithoutRag(query)
+        return
     helper.configureSettings()
     index = getIndex()
     chatHistory = [
@@ -37,8 +40,8 @@ def retrieveResponseWithRag(query: QueryResponseElement)-> None:
     logger.debug(f"Here comes chat history: {chatHistory}")
     for el in chatHistory:
         logger.debug(f" - {str(el)}")
-    chatEngine = getChatEngine(index, chatHistory)
-    response = chatEngine.chat(query.query.chat_message).response
+    queryEngine = getQueryEngine(index,chatHistory)
+    response = queryEngine.query(query.query.chat_message).response
     query.response = ChatElement(
         chat_id = query.query.chat_id,
         chat_role = Config.ROLE_ASSISTANT,
@@ -93,24 +96,14 @@ def getIndex() -> VectorStoreIndex:
     return index
 
 
-def getQueryEngine(index: VectorStoreIndex) -> BaseQueryEngine:
+def getQueryEngine(index: VectorStoreIndex, chatHistoryMessages: List[ChatMessage]) -> BaseQueryEngine:
     queryEngine = index.as_query_engine(
         llm=helper.getLlm(),
         similarity_top_k=Config.SIMILARITY_TOP_KEY,
-        text_qa_template=Config.TEXT_QA_TEMPLATE,
-        refine_template=Config.REFINE_TEMPLATE
+        text_qa_template=ChatPromptTemplate(chatHistoryMessages + Config.TEXT_QA_TEMPLATE),
+        refine_template=ChatPromptTemplate(chatHistoryMessages + Config.REFINE_TEMPLATE)
     )
     return queryEngine
-
-
-def getChatEngine(index: VectorStoreIndex, chatHistoryMessages: List[ChatMessage]) -> CondenseQuestionChatEngine:
-    chatEngine = CondenseQuestionChatEngine.from_defaults(
-        query_engine=getQueryEngine(index),
-        llm=helper.getLlm(),
-        chat_history=chatHistoryMessages,
-        verbose=True
-    )
-    return chatEngine
 
 
 def getChatElementResponse(chatElementQuery: ChatElement, response: str, timeTaken: float, chatId: str) -> ChatElement:
@@ -122,3 +115,15 @@ def getChatElementResponse(chatElementQuery: ChatElement, response: str, timeTak
         timeTaken=timeTaken
     )
     return chatElementResponse
+
+def isVectorDbEmpty() -> bool:
+    client = helper.createWeaviateClient()
+    response = (
+        client.query
+        .get(Config.DOCUMENT_CLASS_NAME, ["file_name"])
+        .do()
+    )
+    storedDocs = response.get("data", {}).get("Get", {}).get(Config.DOCUMENT_CLASS_NAME, [])
+    if len(storedDocs) == 0:
+        return True
+    return False

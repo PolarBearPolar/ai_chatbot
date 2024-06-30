@@ -61,7 +61,7 @@ class Config:
     LLM_API_KEY=os.environ.get("LLM_API_KEY")
     LLM_REQUEST_TIMEOUT = 20000
     LLM_TEMPERATURE = __getFloatLlmTemperature(os.environ.get("LLM_TEMPERATURE"))
-    SIMILARITY_TOP_KEY = 10
+    SIMILARITY_TOP_KEY = 5
 
     # Promt template configuration
     SYSTEM_ROLE = """\
@@ -96,32 +96,16 @@ class Config:
     when giving an answer.
     Refined Answer: \
     """
-    TEXT_QA_TEMPLATE = ChatPromptTemplate(
-        [
-            #ChatMessage(
-            #    role=MessageRole.SYSTEM,
-            #    content=(
-            #        SYSTEM_ROLE
-            #    ),
-            #),
+    TEXT_QA_TEMPLATE = [
             ChatMessage(
                 role=MessageRole.USER, 
                 content=TEXT_QA_TEMPLATE_STR
             ),
         ]
-    )
-    REFINE_TEMPLATE = ChatPromptTemplate(
-        [
-            #ChatMessage(
-            #    role=MessageRole.SYSTEM,
-            #    content=(
-            #        SYSTEM_ROLE
-            #    ),
-            #),
+    REFINE_TEMPLATE = [
             ChatMessage(
                 role=MessageRole.USER, 
                 content=REFINE_TEMPLATE_STR
             ),
         ]
-    )
 
