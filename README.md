@@ -13,9 +13,9 @@ This is an AI powered psychological assistant application. The assistant specili
 ## User Interface Layout 🖼️
 Here is a basic description of the user interface of the application.
 ![image](https://github.com/PolarBearPolar/ai_chatbot/assets/88388315/d896f639-089a-46cc-8f9a-4ecefca705d9)
-1. User information form
+1. User information form.
 2. Chat history. Click on the **New chat+** button to create a new chat with the assistant. Click on other chat buttons to switch between the chats you have already initiated with the assitant.
-3. A short description of the assistant. The description area contains the **Delete chat** button. It is active only when a chat is selected. If you click on it, the chat currently opened will be deleted.
+3. A short description of the assistant. The description area contains the **Delete chat** button. It is active only when a chat is selected. If you click on it, the opened chat will be deleted.
 4. The chat area. Write your question/queries into the query bar and send them to the assistant to have a conversation.
 ## Application Architecture Design 🛠️
 Here is the project architecture.
@@ -25,8 +25,9 @@ The initial idea of this project was to create a local chatbot API using an open
 - Make sure you have Docker installed.
 - Make sure ports **8501**, **8000**, **8001**, **5432**, **8080** are not used on your local machine.
 - Clone the repository to any directory on your local machine
-- **cd** into the directory that contains the cloned repo in command line and run the following command there (Linux Docker command example)
+- **cd** into the directory that contains the cloned repo.
 - Open the **docker-compose.yml** file and replace the *LLM_API_KEY: '\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*'* with *LLM_API_KEY: your api key that you copied*.
+- Run the following command there (Linux Docker command example)
 ```
 sudo docker compose -f docker-compose.yml up
 ```
@@ -36,6 +37,7 @@ sudo docker compose -f docker-compose.yml up
 sudo docker exec chatbot python3 ingest.py
 ```
 - You may start using the application.
+-   
 If you ever need to delete your RAG data from the vector database, run the following command:
 ```
 sudo docker exec chatbot python3 clear_vector_db.py
