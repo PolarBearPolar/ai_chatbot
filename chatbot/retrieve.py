@@ -1,75 +1,85 @@
 import helper
-import time
-from llama_index.core import VectorStoreIndex, Settings
+import logging
+from llama_index.core import VectorStoreIndex, Settings, ChatPromptTemplate
 from llama_index.core.chat_engine import CondenseQuestionChatEngine
 from llama_index.vector_stores.weaviate import WeaviateVectorStore
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core.base.base_query_engine import BaseQueryEngine
 from typing import List
-from chat_history import ChatHistory
 from config import Config
-from chat_element import ChatElement
+from model import ChatElement, QueryResponseElement
+from datetime import datetime, timezone
 
 
-logger = helper.getFileLogger(__name__)
+logger = logging.getLogger(__name__)
 
-def retrieveResponse(chatElementQuery: ChatElement) -> ChatElement:
-    response = None
-    logger.debug(f"Trying to answer the query:\n\tRAG is enabled: {chatElementQuery.isRagUsed}\n\tchat id: {chatElementQuery.chatId}\n\tquery:\n{chatElementQuery.query}")
-    if chatElementQuery.isRagUsed:
-        response = retrieveResponseWithRag(chatElementQuery)
-    elif not chatElementQuery.isRagUsed:
-        response = retrieveResponseWithoutRag(chatElementQuery)
-    return response
+def retrieveResponse(query: QueryResponseElement) -> None:
+    logger.info(f"Trying to answer the query:\n\tRAG is enabled: {query.is_rag_used}\n\tquery:\n{query.query.chat_message}")
+    if query.is_rag_used:
+        retrieveResponseWithRag(query)
+    elif not query.is_rag_used:
+        retrieveResponseWithoutRag(query)
 
 
-def retrieveResponseWithRag(chatElementQuery: ChatElement) -> ChatElement:
-    startTime = time.time()
+def retrieveResponseWithRag(query: QueryResponseElement)-> None:
+    if isVectorDbEmpty():
+        retrieveResponseWithoutRag(query)
+        return
     helper.configureSettings()
     index = getIndex()
-    chatHistory = helper.getChatHistory()
-    chatHistoryId, chatHistoryMessages = chatHistory.getMessages(chatId=chatElementQuery.chatId)
-    if len(chatHistoryMessages) > 0:
-        logger.debug("Using chat engine...")
-        chatEngine = getChatEngine(index, chatHistoryMessages)
-        response = chatEngine.chat(chatElementQuery.query).response
-    else:
-        logger.debug("Using query engine...")
-        queryEngine = getQueryEngine(index)
-        response = queryEngine.query(chatElementQuery.query).response
-    chatHistory.insertMessages(chatHistoryId, ChatHistory.ROLE_HUMAN, chatElementQuery.query)
-    chatHistory.insertMessages(chatHistoryId, ChatHistory.ROLE_ASSISTANT, response)
-    endTime = time.time()
-    timeTaken = round(endTime - startTime, Config.TIME_TAKEN_DIGIT_NUMBER)
-    logger.debug(f"A response has been generated in {timeTaken} sec...")
-    chatElementResponse = getChatElementResponse(chatElementQuery, response, timeTaken, chatHistoryId)
-    return chatElementResponse
-
-
-def retrieveResponseWithoutRag(chatElementQuery: ChatElement) -> ChatElement:
-    startTime = time.time()
-    llm = helper.getLlm()
-    chatHistory = helper.getChatHistory()
-    chatHistoryId, chatHistoryMessages = chatHistory.getMessages(chatId=chatElementQuery.chatId)
-    if len(chatHistoryMessages) > 0:
-        logger.debug("Using chat engine...")
-        chatHistoryMessages.append(
-            ChatMessage(
-                role=MessageRole.USER,
-                content=chatElementQuery.query
+    chatHistory = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                Config.SYSTEM_ROLE
             )
         )
-        response = llm.chat(chatHistoryMessages).message.content
-    else:
-        logger.debug("Using query engine...")
-        response = llm.complete(chatElementQuery.query).text
-    chatHistory.insertMessages(chatHistoryId, ChatHistory.ROLE_HUMAN, chatElementQuery.query)
-    chatHistory.insertMessages(chatHistoryId, ChatHistory.ROLE_ASSISTANT, response)
-    endTime = time.time()
-    timeTaken = round(endTime - startTime, Config.TIME_TAKEN_DIGIT_NUMBER)
-    logger.debug(f"A response has been generated in {timeTaken} sec...")
-    chatElementResponse = getChatElementResponse(chatElementQuery, response, timeTaken, chatHistoryId)
-    return chatElementResponse
+    ]
+    if len(query.chat_history) > 0:
+        chatHistory.extend(query.getTransformedChatHistory())
+    logger.debug(f"Here comes chat history: {chatHistory}")
+    for el in chatHistory:
+        logger.debug(f" - {str(el)}")
+    queryEngine = getQueryEngine(index,chatHistory)
+    response = queryEngine.query(query.query.chat_message).response
+    query.response = ChatElement(
+        chat_id = query.query.chat_id,
+        chat_role = Config.ROLE_ASSISTANT,
+        chat_message = response,
+        created_at = datetime.now(timezone.utc),
+        user_id = query.query.user_id
+    )
+
+
+def retrieveResponseWithoutRag(query: QueryResponseElement) -> None:
+    llm = helper.getLlm()
+    chatHistory = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                Config.SYSTEM_ROLE
+            )
+        )
+    ]
+    if len(query.chat_history) > 0:
+        chatHistory.extend(query.getTransformedChatHistory())
+    chatHistory.append(
+        ChatMessage(
+            role=MessageRole.USER,
+            content=query.query.chat_message
+        )
+    )
+    logger.debug(f"Here comes chat history: {chatHistory}")
+    for el in chatHistory:
+        logger.debug(f" - {str(el)}")
+    response = llm.chat(chatHistory).message.content
+    query.response = ChatElement(
+        chat_id = query.query.chat_id,
+        chat_role = Config.ROLE_ASSISTANT,
+        chat_message = response,
+        created_at = datetime.now(timezone.utc),
+        user_id = query.query.user_id
+    )
 
 
 def getIndex() -> VectorStoreIndex:
@@ -86,24 +96,14 @@ def getIndex() -> VectorStoreIndex:
     return index
 
 
-def getQueryEngine(index: VectorStoreIndex) -> BaseQueryEngine:
+def getQueryEngine(index: VectorStoreIndex, chatHistoryMessages: List[ChatMessage]) -> BaseQueryEngine:
     queryEngine = index.as_query_engine(
         llm=helper.getLlm(),
         similarity_top_k=Config.SIMILARITY_TOP_KEY,
-        text_qa_template=Config.TEXT_QA_TEMPLATE,
-        refine_template=Config.REFINE_TEMPLATE
+        text_qa_template=ChatPromptTemplate(chatHistoryMessages + Config.TEXT_QA_TEMPLATE),
+        refine_template=ChatPromptTemplate(chatHistoryMessages + Config.REFINE_TEMPLATE)
     )
     return queryEngine
-
-
-def getChatEngine(index: VectorStoreIndex, chatHistoryMessages: List[ChatMessage]) -> CondenseQuestionChatEngine:
-    chatEngine = CondenseQuestionChatEngine.from_defaults(
-        query_engine=getQueryEngine(index),
-        llm=helper.getLlm(),
-        chat_history=chatHistoryMessages,
-        verbose=True
-    )
-    return chatEngine
 
 
 def getChatElementResponse(chatElementQuery: ChatElement, response: str, timeTaken: float, chatId: str) -> ChatElement:
@@ -115,3 +115,15 @@ def getChatElementResponse(chatElementQuery: ChatElement, response: str, timeTak
         timeTaken=timeTaken
     )
     return chatElementResponse
+
+def isVectorDbEmpty() -> bool:
+    client = helper.createWeaviateClient()
+    response = (
+        client.query
+        .get(Config.DOCUMENT_CLASS_NAME, ["file_name"])
+        .do()
+    )
+    storedDocs = response.get("data", {}).get("Get", {}).get(Config.DOCUMENT_CLASS_NAME, [])
+    if len(storedDocs) == 0:
+        return True
+    return False
