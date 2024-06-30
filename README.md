@@ -36,8 +36,8 @@ sudo docker compose -f docker-compose.yml up
 ```
 sudo docker exec chatbot python3 ingest.py
 ```
-- You may start using the application.
--   
+- You may start using the application now.
+   
 If you ever need to delete your RAG data from the vector database, run the following command:
 ```
 sudo docker exec chatbot python3 clear_vector_db.py
