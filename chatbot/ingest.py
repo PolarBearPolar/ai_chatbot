@@ -1,11 +1,20 @@
 import os
 import helper
+import logging
 from weaviate import Client
 from llama_index.core import VectorStoreIndex, StorageContext, SimpleDirectoryReader, Settings
 from llama_index.vector_stores.weaviate import WeaviateVectorStore
 from config import Config
 
-logger = helper.getFileLogger(__name__)
+# Set up logging
+logging.basicConfig(
+	level=Config.LOG_LEVEL,
+	format=Config.LOG_FORMAT,
+	handlers=[
+		logging.FileHandler(Config.LOG_FILE, mode="a")
+	]
+)
+logger = logging.getLogger(__name__)
 
 def main():
     helper.configureSettings()

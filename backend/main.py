@@ -73,6 +73,7 @@ def updateUser(userId: str, user: User, session: Session=Depends(getSession)):
 # Create new chat query and response to it
 @app.post("/query/", response_model=Optional[ChatElement])
 def createChatElements(chatElement: ChatElement, session: Session=Depends(getSession)):
+    logger.debug(f"Query object: {chatElement}")
     # Get chat history
     chatHistoryStatement = select(ChatElement).where(and_(ChatElement.user_id == chatElement.user_id, ChatElement.chat_id == chatElement.chat_id))
     chatHistory = [ChatElement(**element.model_dump()) for element in session.exec(chatHistoryStatement).all()]
@@ -94,9 +95,10 @@ def createChatElements(chatElement: ChatElement, session: Session=Depends(getSes
         timeout=constants.CHATBOT_REQUEST_TIMEOUT
     )
     # Save response to database
-    if queryRequest.status_code == 200 and queryRequest.json().get("response", None) is not None:
+    if queryRequest.status_code == 200 and queryRequest.json().get("response", None) is not None and queryRequest.json().get("response").get("chat_message", None) is not None:
         responseChatElement = ChatElement(**queryRequest.json()["response"])
-        logger.info(f"The response to the query is as follows: {responseChatElement.response.chat_message}")
+        logger.debug(f"Response object: {responseChatElement}")
+        logger.info(f"The response to the query is as follows: {responseChatElement.chat_message}")
         session.add(responseChatElement)
         session.commit()
         session.refresh(responseChatElement)
@@ -110,7 +112,7 @@ def getUserChatElements(userId: str=None, chatElementId: str=None, session: Sess
     if not userId:
         return []
     if  chatElementId is not None:
-        statement = select(ChatElement).where(and_(ChatElement.user_id == userId, ChatElement.chat_id == chatElementId))
+        statement = select(ChatElement).where(and_(ChatElement.user_id == userId, ChatElement.chat_id == chatElementId)).order_by(ChatElement.created_at)
         results = session.exec(statement).all()
         return results
     else:

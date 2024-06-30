@@ -212,7 +212,7 @@ def processQuery(query: str=None) -> None:
         )
     if chatElementPostRequest.status_code == 200 and chatElementPostRequest.json() is not None:
         if not st.session_state.chat:
-            st.session_state.chat = chatElement
+            st.session_state.chat = ChatElement(**chatElementPostRequest.json())
         displayChatElement(constants.ROLE_ASSISTANT, chatElementPostRequest.json()["chat_message"], True)
         st.session_state.messages.append(
             {

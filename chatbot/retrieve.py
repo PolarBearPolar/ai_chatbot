@@ -1,5 +1,5 @@
 import helper
-import time
+import logging
 from llama_index.core import VectorStoreIndex, Settings
 from llama_index.core.chat_engine import CondenseQuestionChatEngine
 from llama_index.vector_stores.weaviate import WeaviateVectorStore
@@ -11,10 +11,10 @@ from model import ChatElement, QueryResponseElement
 from datetime import datetime, timezone
 
 
-logger = helper.getFileLogger(__name__)
+logger = logging.getLogger(__name__)
 
 def retrieveResponse(query: QueryResponseElement) -> None:
-    logger.debug(f"Trying to answer the query:\n\tRAG is enabled: {query.is_rag_used}\n\tquery:\n{query.query.chat_message}")
+    logger.info(f"Trying to answer the query:\n\tRAG is enabled: {query.is_rag_used}\n\tquery:\n{query.query.chat_message}")
     if query.is_rag_used:
         retrieveResponseWithRag(query)
     elif not query.is_rag_used:
@@ -24,14 +24,21 @@ def retrieveResponse(query: QueryResponseElement) -> None:
 def retrieveResponseWithRag(query: QueryResponseElement)-> None:
     helper.configureSettings()
     index = getIndex()
+    chatHistory = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                Config.SYSTEM_ROLE
+            )
+        )
+    ]
     if len(query.chat_history) > 0:
-        logger.debug("Using chat engine...")
-        chatEngine = getChatEngine(index, query.getTransformedChatHistory())
-        response = chatEngine.chat(query.query.chat_message).response
-    else:
-        logger.debug("Using query engine...")
-        queryEngine = getQueryEngine(index)
-        response = queryEngine.query(query.query.chat_message).response
+        chatHistory.extend(query.getTransformedChatHistory())
+    logger.debug(f"Here comes chat history: {chatHistory}")
+    for el in chatHistory:
+        logger.debug(f" - {str(el)}")
+    chatEngine = getChatEngine(index, chatHistory)
+    response = chatEngine.chat(query.query.chat_message).response
     query.response = ChatElement(
         chat_id = query.query.chat_id,
         chat_role = Config.ROLE_ASSISTANT,
@@ -43,19 +50,26 @@ def retrieveResponseWithRag(query: QueryResponseElement)-> None:
 
 def retrieveResponseWithoutRag(query: QueryResponseElement) -> None:
     llm = helper.getLlm()
-    if len(query.chat_history) > 0:
-        logger.debug("Using chat engine...")
-        transformedChatHistory = query.getTransformedChatHistory()
-        transformedChatHistory.append(
-            ChatMessage(
-                role=MessageRole.USER,
-                content=query.query.chat_message
+    chatHistory = [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                Config.SYSTEM_ROLE
             )
         )
-        response = llm.chat(transformedChatHistory).message.content
-    else:
-        logger.debug("Using query engine...")
-        response = llm.complete(query.query.chat_message).text
+    ]
+    if len(query.chat_history) > 0:
+        chatHistory.extend(query.getTransformedChatHistory())
+    chatHistory.append(
+        ChatMessage(
+            role=MessageRole.USER,
+            content=query.query.chat_message
+        )
+    )
+    logger.debug(f"Here comes chat history: {chatHistory}")
+    for el in chatHistory:
+        logger.debug(f" - {str(el)}")
+    response = llm.chat(chatHistory).message.content
     query.response = ChatElement(
         chat_id = query.query.chat_id,
         chat_role = Config.ROLE_ASSISTANT,
