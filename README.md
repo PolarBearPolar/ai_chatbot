@@ -1,9 +1,9 @@
 # AI Psychological Assistant 🤖
 ## Introduction 
-This is an AI powered psychological assistant application. The assistant specilizes in managing stress, depression, anxiety, fear, and apathy.
-👉 The application is easy to navigate and use.
-👉 You can have multiple chats with the assistant and all of them will be stored (persisted) in a PostgreSQL database. In case you want to remove any chat from your chat history, you can do it by simply clicking the **Delete chat** button.
-👉 The project is split into multiple components/services. The service that is responsible for large language model (LLM) interaction allows to include external data (external for the LLM) when generating answers to your queries (it is called Retrieval-Augmented Generation (RAG)). 'External', in this context, means the information that the LLM is not familar with and has not been trained on. In our case, this 'external' information is the psychology-related data stored in txt format that I considered to be the most relevant to the topic of dealing with stress, depression, anxiety, fear, and apathy. This data will be called RAG data throughout this description.
+This is an AI powered psychological assistant application. The assistant specilizes in managing stress, depression, anxiety, fear, and apathy.  
+👉 The application is easy to navigate and use.  
+👉 You can have multiple chats with the assistant and all of them will be stored (persisted) in a PostgreSQL database. In case you want to remove any chat from your chat history, you can do it by simply clicking the **Delete chat** button.  
+👉 The project is split into multiple components/services. The service that is responsible for large language model (LLM) interaction allows to include external data (external for the LLM) when generating answers to your queries (it is called Retrieval-Augmented Generation (RAG)). 'External', in this context, means the information that the LLM is not familar with and has not been trained on. In our case, this 'external' information is the psychology-related data stored in txt format that I considered to be the most relevant to the topic of dealing with stress, depression, anxiety, fear, and apathy. This data will be called RAG data throughout this description.  
 👉 RAG data is processed (transformed into numerical vectors) and stored/persisted in a Weaviate vector database.
 ## User Interface Layout 🖼️
 Here is a basic description of the user interface of the application.
