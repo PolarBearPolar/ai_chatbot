@@ -1,12 +1,19 @@
 import streamlit as st
-st.set_page_config(layout="wide", page_title="AI Psychological Assistant", page_icon = 'static/images/logo.png')
+import constants
+st.set_page_config(
+    layout="wide", 
+    page_title=constants.APPLICATION_TITLE, 
+    page_icon = constants.IMAGE_PATH_LOGO
+)
 import requests
 import time
-import constants
 import logging
+import helper
 from model import User, ChatElement
 from urllib.parse import urljoin
 from typing import Generator
+from streamlit_lottie import st_lottie
+from streamlit_extras.stylable_container import stylable_container
 
 # Set up logging
 logging.basicConfig(
@@ -90,7 +97,7 @@ def updateAge() -> None:
 
 
 def getAvatar(role: str=None) -> str:
-    avatar = "🤖"
+    avatar = "👩‍⚕️"
     if role == constants.ROLE_USER:
         if st.session_state.gender == constants.GENDER_MALE:
             avatar = "👦"
@@ -239,24 +246,46 @@ def main():
     initSessionState()
     # Handle autentication
     if not st.session_state.user:
+        st.markdown(constants.ASSISTANT_WELCOMING_MESSAGE_1, unsafe_allow_html=True)
         st.text_input(label="Username:", value="", key="username")
         st.text_input(label="Password:", value="", type="password", key="userPassword")
         st.button("Log in", type="primary", on_click=authenticate)
+        st_lottie(
+            helper.loadLottieAnimationFile(constants.IMAGE_PATH_WELCOME),
+            quality="low",
+            height=400
+        )
     # Display chatbot view
     else:
         updateUserState()
         # Display header and description
-        tcol1, tcol2 = st.columns([4, 1])
-        with tcol1:
-            st.title(constants.ASSISTANT_TITLE)
-            st.markdown(fixNewLines(constants.ASSISTANT_DESCRIPTION))
+        st.markdown(constants.ASSISTANT_TITLE, unsafe_allow_html=True)
+        st_lottie(
+                helper.loadLottieAnimationFile(constants.IMAGE_PATH_HELP),
+                quality="low",
+                height=200
+            )
+        st.markdown(fixNewLines(constants.ASSISTANT_DESCRIPTION_1), unsafe_allow_html=True)
+        st_lottie(
+                helper.loadLottieAnimationFile(constants.IMAGE_PATH_CHAT),
+                quality="low",
+                height=200
+            )
+        st.markdown(fixNewLines(constants.ASSISTANT_DESCRIPTION_2), unsafe_allow_html=True)
+        with stylable_container(
+            key="action_button",
+            css_styles=constants.CSS_STYLE_ACTION_BUTTON
+        ):
+            st.button("**START NEW CHAT**", type="primary", key="new_chat", on_click=openChat, use_container_width=True)
+            if st.session_state.isChatModeOn:
+                st.button("**DELETE CURRENT CHAT**", type="primary", on_click=deleteChat, use_container_width=True)
         st.divider()
         # Display sidebar elements
+        st.logo(constants.IMAGE_PATH_CHAT_HISTORY)
         with st.sidebar:
             # Display user personal information
-            st.sidebar.markdown("# User information :clipboard:")
-            expander = st.sidebar.expander("...", expanded=False)
-            scol1, scol2 = expander.columns(2)
+            st.sidebar.markdown("# User Information :clipboard:")
+            scol1, scol2 = st.sidebar.columns(2)
             scol1.radio(
                 "Gender", constants.USER_GENDERS, 
                 key="gender", 
@@ -273,8 +302,7 @@ def main():
             )
             st.sidebar.divider()
             # Display chat history
-            st.sidebar.markdown("# Chat history :spiral_calendar_pad:")
-            st.button("New chat +", type="primary", key="new_chat", on_click=openChat)
+            st.sidebar.markdown("# Chat History :speech_balloon:")
             getUserChats()
             for i, chat in enumerate(st.session_state.userChats):
                 isButtonDisabled = False
@@ -290,8 +318,6 @@ def main():
                 )
         # Display chat view
         if st.session_state.isChatModeOn:
-            with tcol2:
-                st.button("Delete chat", type="primary", on_click=deleteChat)
             for message in st.session_state.messages:
                 displayChatElement(message["role"], message["content"])
             if prompt := st.chat_input("Ask your question here..."):
