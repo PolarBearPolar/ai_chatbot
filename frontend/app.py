@@ -29,6 +29,12 @@ logger = logging.getLogger(__name__)
 def initSessionState() -> None:
     if "user" not in st.session_state:
         st.session_state.user = None
+    if "language" not in st.session_state:
+        st.session_state.language = constants.DEFAULT_LANGUAGE
+    if "selectBoxLanguage" not in st.session_state:
+        st.session_state.selectBoxLanguage = None
+    if "webElementTexts" not in st.session_state:
+        st.session_state.webElementTexts = constants.WEB_ELEMENT_TEXTS.get(constants.DEFAULT_LANGUAGE)
     if "isChatModeOn" not in st.session_state:
         st.session_state.isChatModeOn = False
     if "chat" not in st.session_state:
@@ -63,6 +69,11 @@ def authenticate() -> None:
             logger.info(f"{st.session_state.user.username} is using application now...")
 
 
+def updateLanguage() -> None:
+    st.session_state.language = st.session_state.selectBoxLanguage
+    st.session_state.webElementTexts = constants.WEB_ELEMENT_TEXTS.get(st.session_state.language)
+
+
 def updateUserState() -> None:
     if not st.session_state.user:
         return
@@ -71,13 +82,6 @@ def updateUserState() -> None:
     )
     if userRequest.status_code == 200:
         st.session_state.user = User(**userRequest.json())
-
-
-def getGenderIndex(gender: str = None) -> int:
-    for i, userGender in enumerate(constants.USER_GENDERS):
-        if str(gender).lower() == userGender.lower():
-            return i
-    return None
 
 
 def updateGender() -> None:
@@ -211,9 +215,10 @@ def processQuery(query: str=None) -> None:
                 on_click=openChat, 
                 args=[chatElement]
             )
-    with st.spinner("Processing your query..."):
+    with st.spinner(st.session_state.webElementTexts["chat"]["text_wait"]):
         chatElementPostRequest = requests.post(
             urljoin(constants.BACKEND_BASE_URL, constants.BACKEND_QUERY_ENDPOINT), 
+            headers={constants.BACKEND_HEADER_LANGUAGE: st.session_state.language},
             data=chatElement.model_dump_json(),
             timeout=constants.BACKEND_REQUEST_TIMEOUT
         )
@@ -244,12 +249,27 @@ def main():
     ### Main block of code ###
     # Initialize values in session state
     initSessionState()
-    # Handle autentication
+    # Handle autentication and language preferences
     if not st.session_state.user:
-        st.markdown(constants.ASSISTANT_WELCOMING_MESSAGE_1, unsafe_allow_html=True)
-        st.text_input(label="Username:", value="", key="username")
-        st.text_input(label="Password:", value="", type="password", key="userPassword")
-        st.button("Log in", type="primary", on_click=authenticate)
+        st.markdown(
+            constants.ASSISTANT_WELCOMING_MESSAGE_WRAPPER.format(
+                color=constants.HEADER_COLOR, 
+                text=st.session_state.webElementTexts["authentication"]["text_welcome"]
+            ), 
+            unsafe_allow_html=True
+        )
+        st.selectbox(
+            f"{st.session_state.webElementTexts['authentication']['label_language_selectbox']}:", 
+            options=st.session_state.webElementTexts["authentication"]["selectbox_language_options"].keys(),
+            format_func=lambda x: st.session_state.webElementTexts["authentication"]["selectbox_language_options"][x],
+            index=helper.getKeyIndex(st.session_state.webElementTexts["authentication"]["selectbox_language_options"], st.session_state.language),
+            placeholder=f"{st.session_state.webElementTexts['authentication']['label_language_selectbox']}...",
+            key="selectBoxLanguage",
+            on_change=updateLanguage
+        )
+        st.text_input(label=st.session_state.webElementTexts["authentication"]["label_username"], value="", key="username")
+        st.text_input(label=st.session_state.webElementTexts["authentication"]["label_password"], value="", type="password", key="userPassword")
+        st.button(st.session_state.webElementTexts["authentication"]["button_log_in"], type="primary", on_click=authenticate)
         st_lottie(
             helper.loadLottieAnimationFile(constants.IMAGE_PATH_WELCOME),
             quality="low",
@@ -259,50 +279,85 @@ def main():
     else:
         updateUserState()
         # Display header and description
-        st.markdown(constants.ASSISTANT_TITLE, unsafe_allow_html=True)
+        st.markdown(
+            constants.ASSISTANT_TITLE_WRAPPER.format(
+                color=constants.HEADER_COLOR, 
+                text=st.session_state.webElementTexts["chat"]["text_title"]
+            ), 
+            unsafe_allow_html=True
+        )
         st_lottie(
                 helper.loadLottieAnimationFile(constants.IMAGE_PATH_HELP),
                 quality="low",
                 height=200
             )
-        st.markdown(fixNewLines(constants.ASSISTANT_DESCRIPTION_1), unsafe_allow_html=True)
+        st.markdown(
+            fixNewLines(
+                constants.ASSISTANT_CHAT_DESCRIPTION_WRAPPER.format(
+                    color=constants.HEADER_COLOR, 
+                    text=st.session_state.webElementTexts["chat"]["text_chat_description"]
+                ),
+            ), 
+            unsafe_allow_html=True
+        )
         st_lottie(
                 helper.loadLottieAnimationFile(constants.IMAGE_PATH_CHAT),
                 quality="low",
                 height=200
             )
-        st.markdown(fixNewLines(constants.ASSISTANT_DESCRIPTION_2), unsafe_allow_html=True)
+        st.markdown(
+            fixNewLines(
+                constants.ASSISTANT_USAGE_DESCRIPTION_WRAPPER.format(
+                    color=constants.HEADER_COLOR, 
+                    text=st.session_state.webElementTexts["chat"]["text_usage_description"]
+                ),
+            ), 
+            unsafe_allow_html=True
+        )
         with stylable_container(
             key="action_button",
             css_styles=constants.CSS_STYLE_ACTION_BUTTON
         ):
-            st.button("**START NEW CHAT**", type="primary", key="new_chat", on_click=openChat, use_container_width=True)
+            st.button(
+                f"**{st.session_state.webElementTexts['chat']['button_start_chat']}**", 
+                type="primary", 
+                key="new_chat", 
+                on_click=openChat, 
+                use_container_width=True
+            )
             if st.session_state.isChatModeOn:
-                st.button("**DELETE CURRENT CHAT**", type="primary", on_click=deleteChat, use_container_width=True)
+                st.button(
+                    f"**{st.session_state.webElementTexts['chat']['button_delete_chat']}**", 
+                    type="primary", 
+                    on_click=deleteChat, 
+                    use_container_width=True
+                )
         st.divider()
         # Display sidebar elements
         st.logo(constants.IMAGE_PATH_CHAT_HISTORY)
         with st.sidebar:
             # Display user personal information
-            st.sidebar.markdown("# User Information :clipboard:")
+            st.sidebar.markdown(f"# {st.session_state.webElementTexts['sidebar']['label_user_information']} :clipboard:")
             scol1, scol2 = st.sidebar.columns(2)
             scol1.radio(
-                "Gender", constants.USER_GENDERS, 
-                key="gender", 
-                index=getGenderIndex(st.session_state.user.user_gender), 
+                st.session_state.webElementTexts["sidebar"]["label_gender_radio"], 
+                st.session_state.webElementTexts["sidebar"]["radio_gender_options"], 
+                key="gender",
+                format_func=lambda x: st.session_state.webElementTexts["sidebar"]["radio_gender_options"][x],
+                index=helper.getKeyIndex(st.session_state.webElementTexts["sidebar"]["radio_gender_options"], st.session_state.user.user_gender), 
                 on_change=updateGender
             )
             scol2.number_input(
-                "Age", 
+                st.session_state.webElementTexts["sidebar"]["label_age"], 
                 min_value=0, 
-                placeholder="Type a number...", 
+                placeholder=st.session_state.webElementTexts["sidebar"]["placeholder_age"], 
                 key="age", 
                 value=st.session_state.user.user_age, 
                 on_change=updateAge
             )
             st.sidebar.divider()
             # Display chat history
-            st.sidebar.markdown("# Chat History :speech_balloon:")
+            st.sidebar.markdown(f"# {st.session_state.webElementTexts['sidebar']['label_chat_history']} :speech_balloon:")
             getUserChats()
             for i, chat in enumerate(st.session_state.userChats):
                 isButtonDisabled = False
@@ -320,8 +375,9 @@ def main():
         if st.session_state.isChatModeOn:
             for message in st.session_state.messages:
                 displayChatElement(message["role"], message["content"])
-            if prompt := st.chat_input("Ask your question here..."):
+            if prompt := st.chat_input(st.session_state.webElementTexts["chat"]["placeholder_chat"]):
                 processQuery(prompt)
+
 
 if __name__ == "__main__":
     main()

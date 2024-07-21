@@ -2,7 +2,7 @@ import constants
 import requests
 import logging
 from uvicorn import Config, Server
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Header
 from sqlmodel import Session, select
 from model import ChatElement, User, QueryResponseElement
 from database import getSession
@@ -27,6 +27,16 @@ uvicornConfig = Config(
     log_level = "info",
     reload=True
 )
+
+def getLanguage(language: str=None):
+    if language == "en":
+        return "en"
+    elif language == "sr":
+        return "sr"
+    elif language == "ru":
+        return "ru"
+    else:
+        return constants.API_DEFAULT_LANGUAGE
 
 # Create new user
 @app.post("/user/", response_model=User)
@@ -72,7 +82,7 @@ def updateUser(userId: str, user: User, session: Session=Depends(getSession)):
 
 # Create new chat query and response to it
 @app.post("/query/", response_model=Optional[ChatElement])
-def createChatElements(chatElement: ChatElement, session: Session=Depends(getSession)):
+def createChatElements(chatElement: ChatElement, session: Session=Depends(getSession), accept_language: str=Header(None)):
     logger.debug(f"Query object: {chatElement}")
     # Get chat history
     chatHistoryStatement = select(ChatElement).where(and_(ChatElement.user_id == chatElement.user_id, ChatElement.chat_id == chatElement.chat_id))
@@ -87,10 +97,13 @@ def createChatElements(chatElement: ChatElement, session: Session=Depends(getSes
         query=chatElement,
         chat_history=chatHistory
     )
+    # Get response language
+    language = getLanguage(accept_language)
     logger.info(f"A new query has been subitted: {query.query.chat_message}")
     # Send query object to chatbot component to get response
     queryRequest = requests.post(
         f"{constants.CHATBOT_URL}/query",
+        headers={constants.API_HEADER_LANGUAGE: language},
         data = query.model_dump_json(),
         timeout=constants.CHATBOT_REQUEST_TIMEOUT
     )

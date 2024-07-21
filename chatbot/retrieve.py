@@ -13,15 +13,15 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-def retrieveResponse(query: QueryResponseElement) -> None:
+def retrieveResponse(query: QueryResponseElement, language: str) -> None:
     logger.info(f"Trying to answer the query:\n\tRAG is enabled: {query.is_rag_used}\n\tquery:\n{query.query.chat_message}")
     if query.is_rag_used:
-        retrieveResponseWithRag(query)
+        retrieveResponseWithRag(query, language)
     elif not query.is_rag_used:
-        retrieveResponseWithoutRag(query)
+        retrieveResponseWithoutRag(query, language)
 
 
-def retrieveResponseWithRag(query: QueryResponseElement)-> None:
+def retrieveResponseWithRag(query: QueryResponseElement, language: str)-> None:
     if isVectorDbEmpty():
         retrieveResponseWithoutRag(query)
         return
@@ -31,7 +31,7 @@ def retrieveResponseWithRag(query: QueryResponseElement)-> None:
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
-                Config.SYSTEM_ROLE
+                Config.SYSTEM_ROLE.get(language, Config.API_DEFAULT_LANGUAGE)
             )
         )
     ]
@@ -51,13 +51,13 @@ def retrieveResponseWithRag(query: QueryResponseElement)-> None:
     )
 
 
-def retrieveResponseWithoutRag(query: QueryResponseElement) -> None:
+def retrieveResponseWithoutRag(query: QueryResponseElement, language: str) -> None:
     llm = helper.getLlm()
     chatHistory = [
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
-                Config.SYSTEM_ROLE
+                Config.SYSTEM_ROLE.get(language, Config.API_DEFAULT_LANGUAGE)
             )
         )
     ]
