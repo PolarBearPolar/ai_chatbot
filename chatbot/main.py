@@ -1,6 +1,6 @@
 import logging
 from uvicorn import Config, Server
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from model import QueryResponseElement
 from retrieve import retrieveResponse
 from config import Config as ChatbotConfig
@@ -25,8 +25,18 @@ uvicornConfig = Config(
     reload=True
 )
 
+def getLanguage(language: str=None):
+    if language == "en":
+        return "en"
+    elif language == "sr":
+        return "sr"
+    elif language == "ru":
+        return "ru"
+    else:
+        return ChatbotConfig.API_DEFAULT_LANGUAGE
+
 @app.post("/query")
-async def getResponse(query: QueryResponseElement) -> QueryResponseElement:
+async def getResponse(query: QueryResponseElement, accept_language: str=Header(None)) -> QueryResponseElement:
     if query.is_rag_used is None or query.is_rag_used not in [True, False]:
         raise HTTPException(
             status_code=400, 
@@ -38,8 +48,9 @@ async def getResponse(query: QueryResponseElement) -> QueryResponseElement:
             detail=f"Please provide a valid (non-empty) query in the 'query' element."
         )
     else:
+        language = getLanguage(accept_language)
         logger.debug(f"Query object: {query}")
-        retrieveResponse(query=query)
+        retrieveResponse(query=query, language=language)
         if not query.response:
             raise HTTPException(
                 status_code=400,
