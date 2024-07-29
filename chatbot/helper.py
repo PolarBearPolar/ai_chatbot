@@ -2,6 +2,7 @@ import weaviate
 from llama_index.llms.together import TogetherLLM
 from llama_index.core import Settings
 from llama_index.embeddings.langchain import LangchainEmbedding
+from llama_index.core.llms import ChatMessage
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from config import Config
 
@@ -36,3 +37,17 @@ def createWeaviateClient() -> weaviate.Client:
     if not client.schema.exists(class_name=Config.DOCUMENT_CLASS_NAME):
        client.schema.create(Config.WEAVIATE_SCHEMA)
     return client
+
+
+def generatePromptTemplate(templateStr: str, promptRole: str) -> list:
+    return [
+            ChatMessage(
+                role=promptRole, 
+                content=templateStr
+            ),
+        ]
+
+
+def wrapPromptWithLanguageInstruction(language: str, prompt: str) -> str:
+    lanuageInstruction = Config.LANGUAGE_INSTRUCTIONS.get(language, "")
+    return f"{prompt}\n{lanuageInstruction}"
