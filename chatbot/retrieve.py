@@ -13,8 +13,9 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
+
 def retrieveResponse(query: QueryResponseElement, language: str) -> None:
-    logger.info(f"Trying to answer the query:\n\tRAG is enabled: {query.is_rag_used}\n\tquery:\n{query.query.chat_message}")
+    logger.info(f"Trying to answer the query:\n\tRAG is enabled: {query.is_rag_used}\n\tlanguage:\n{language}\n\tquery:\n{query.query.chat_message}")
     if query.is_rag_used:
         retrieveResponseWithRag(query, language)
     elif not query.is_rag_used:
@@ -31,7 +32,7 @@ def retrieveResponseWithRag(query: QueryResponseElement, language: str)-> None:
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
-                Config.SYSTEM_ROLE.get(language, Config.API_DEFAULT_LANGUAGE)
+                helper.wrapPromptWithLanguageInstruction(language, Config.SYSTEM_ROLE)
             )
         )
     ]
@@ -40,7 +41,7 @@ def retrieveResponseWithRag(query: QueryResponseElement, language: str)-> None:
     logger.debug(f"Here comes chat history: {chatHistory}")
     for el in chatHistory:
         logger.debug(f" - {str(el)}")
-    queryEngine = getQueryEngine(index,chatHistory)
+    queryEngine = getQueryEngine(index, chatHistory, language)
     response = queryEngine.query(query.query.chat_message).response
     query.response = ChatElement(
         chat_id = query.query.chat_id,
@@ -57,7 +58,7 @@ def retrieveResponseWithoutRag(query: QueryResponseElement, language: str) -> No
         ChatMessage(
             role=MessageRole.SYSTEM,
             content=(
-                Config.SYSTEM_ROLE.get(language, Config.API_DEFAULT_LANGUAGE)
+                helper.wrapPromptWithLanguageInstruction(language, Config.SYSTEM_ROLE)
             )
         )
     ]
@@ -96,12 +97,16 @@ def getIndex() -> VectorStoreIndex:
     return index
 
 
-def getQueryEngine(index: VectorStoreIndex, chatHistoryMessages: List[ChatMessage]) -> BaseQueryEngine:
+def getQueryEngine(index: VectorStoreIndex, chatHistoryMessages: List[ChatMessage], language: str) -> BaseQueryEngine:
     queryEngine = index.as_query_engine(
         llm=helper.getLlm(),
         similarity_top_k=Config.SIMILARITY_TOP_KEY,
-        text_qa_template=ChatPromptTemplate(chatHistoryMessages + Config.TEXT_QA_TEMPLATE),
-        refine_template=ChatPromptTemplate(chatHistoryMessages + Config.REFINE_TEMPLATE)
+        text_qa_template=ChatPromptTemplate(
+            chatHistoryMessages + helper.generatePromptTemplate(helper.wrapPromptWithLanguageInstruction(language, Config.TEXT_QA_TEMPLATE_STR), MessageRole.USER)
+        ),
+        refine_template=ChatPromptTemplate(
+            chatHistoryMessages + helper.generatePromptTemplate(helper.wrapPromptWithLanguageInstruction(language, Config.REFINE_TEMPLATE_STR), MessageRole.USER)
+        )
     )
     return queryEngine
 
@@ -115,6 +120,7 @@ def getChatElementResponse(chatElementQuery: ChatElement, response: str, timeTak
         timeTaken=timeTaken
     )
     return chatElementResponse
+
 
 def isVectorDbEmpty() -> bool:
     client = helper.createWeaviateClient()

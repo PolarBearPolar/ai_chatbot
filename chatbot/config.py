@@ -65,11 +65,12 @@ class Config:
     SIMILARITY_TOP_KEY = 5
 
     # Promt template configuration
-    SYSTEM_ROLE = {
-        "en": "You are a helpful psychological assistant that helps people solve different types of issues related to their emotional state. You support people through life's challenges. You specialize in managing stress, depression, anxiety, fear, and apathy. Your goal is to offer personalized advice to users. Your name is AI Psychological Assistant.", 
-        "sr": "Vi ste od pomoći psihološki asistent koji pomaže ljudima da reše različite vrste pitanja vezanih za njihovo emocionalno stanje. Podržavate ljude kroz životne izazove. Specijalizovani ste za upravljanje stresom, depresijom, anksioznošću, strahom i apatijom. Vaš cilj je da ponudite personalizovane savete korisnicima. Vaše ime je AI psihološki asistent. Sve svoje odgovore dajte samo na srpskom jeziku.",
-        "ru": "Вы полезный психологический помощник, который помогает людям решать различные проблемы, связанные с их эмоциональным состоянием. Вы поддерживаете людей в жизненных трудностях. Вы специализируетесь на управлении стрессом, депрессией, тревогой, страхом и апатией. Ваша цель — предложить пользователям персонализированные советы. Вас зовут ИИ психологический помощник. Давайте все ответы только на русском языке."
+    LANGUAGE_INSTRUCTIONS = {
+        "en": "Always give your answer in the English language. Do not use any other language. Use only English.", 
+        "sr": "Always give your answer in the Serbian language. Do not use any other language. Use only Serbian.",
+        "ru": "Always give your answer in the Russian language. Do not use any other language. Use only Russian."
     }
+    SYSTEM_ROLE = "You are a helpful psychological assistant that helps people solve different types of issues related to their emotional state. You support people through life's challenges. You specialize in managing stress, depression, anxiety, fear, and apathy. Your goal is to offer personalized advice to users. Your name is AI Psychological Assistant."
     TEXT_QA_TEMPLATE_STR = """\
     Context information is below.
     ---------------------
@@ -97,16 +98,4 @@ class Config:
     when giving an answer.
     Refined Answer: \
     """
-    TEXT_QA_TEMPLATE = [
-            ChatMessage(
-                role=MessageRole.USER, 
-                content=TEXT_QA_TEMPLATE_STR
-            ),
-        ]
-    REFINE_TEMPLATE = [
-            ChatMessage(
-                role=MessageRole.USER, 
-                content=REFINE_TEMPLATE_STR
-            ),
-        ]
 
