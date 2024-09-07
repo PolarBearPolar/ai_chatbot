@@ -1,16 +1,21 @@
 import helper
 import logging
+import warnings
 from config import Config
 
+
+warnings.filterwarnings("ignore")
 # Set up logging
 logging.basicConfig(
 	level=Config.LOG_LEVEL,
 	format=Config.LOG_FORMAT,
 	handlers=[
-		logging.FileHandler(Config.LOG_FILE, mode="a")
+		logging.FileHandler(Config.LOG_FILE, mode="a"),
+        logging.StreamHandler()
 	]
 )
 logger = logging.getLogger(__name__)
+
 
 def main():
     try:

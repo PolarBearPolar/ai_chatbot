@@ -25,7 +25,7 @@ class Config:
     ROLE_USER = "USER"
 
     # Logging configuration
-    LOG_LEVEL = logging.DEBUG
+    LOG_LEVEL = logging.INFO
     LOG_FORMAT = "%(asctime)s - %(name)s - %(message)s"
     LOG_FILE = "log.log"
 
@@ -41,28 +41,46 @@ class Config:
                         "name": "content",
                         "dataType": ["text"],
                         "description": "Text content for the document",
-                    },
+                    }
                 ],
             },
         ],
     }
     DOCUMENT_CLASS_NAME = "Document"
     DOCUMENT_CONTENT_PROPERTY = "content"
+    DOCUMENT_TOPIC_PROPERTY = "topic"
     # Document directory that is used
     # to load documents into vector database
     DOCUMENTS_DIRECTORY = "data"
 
     # Embedding model configuration
     EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"
-    EMBEDDING_CHUNK_SIZE = 1000
+    EMBEDDING_CHUNK_SIZE = 512
     EMBEDDING_CHUNK_OVERLAP = 20
 
     # Large language model configuration
     LLM = os.environ.get("LLM")
-    LLM_API_KEY=os.environ.get("LLM_API_KEY")
+    LLM_API_KEY = os.environ.get("LLM_API_KEY")
     LLM_REQUEST_TIMEOUT = 20000
     LLM_TEMPERATURE = __getFloatLlmTemperature(os.environ.get("LLM_TEMPERATURE"))
-    SIMILARITY_TOP_KEY = 5
+    SIMILARITY_TOP_KEY = 10
+
+    # Topic configuration
+    TOPICS = [
+        {"topic": "other", "is_rag_used": False},
+        {"topic": "stress", "is_rag_used": True},
+        {"topic": "depression", "is_rag_used": True},
+        {"topic": "anxiety", "is_rag_used": True},
+        {"topic": "fear", "is_rag_used": True},
+        {"topic": "apathy", "is_rag_used": True}
+    ]
+    TOPIC_SELECTING_QUESTION_TEMPLATE = """
+    Here is a list of available topics:
+    {topics}
+    You have a chat history provided below. Considering the chat history, please choose one topic out of the \
+    list of the available topics that describes it. Only output one word (the topic name) and nothing else.
+    {chat_history}
+    """
 
     # Promt template configuration
     LANGUAGE_INSTRUCTIONS = {

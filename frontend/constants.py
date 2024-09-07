@@ -92,8 +92,8 @@ WEB_ELEMENT_TEXTS = {
             "text_chat_description": "Upoznajte svog ličnog psihološkog terapeuta i pomoćnog chat bota, ovde da vas podrži kroz životne izazove.",
             "text_usage_description": "Kreirajte novo ćaskanje da biste započeli novu konverzaciju ili izaberite postojeće ćaskanje na kartici bočne trake (možete ga otvoriti u gornjem levom uglu) da biste nastavili postojeću konverzaciju.",
             "text_wait": "Obrada vašeg pitanja...",
-            "button_start_chat": "ZAPOČNI NOVI ĆAT",
-            "button_delete_chat": "IZBRIŠI TRENUTNO ĆAT",
+            "button_start_chat": "ZAPOČNITE NOVI ĆET",
+            "button_delete_chat": "IZBRIŠITE TRENUTNI ĆET",
             "placeholder_chat": "Postavite pitanje ovde..."
         }, 
         "sidebar": {
@@ -104,7 +104,7 @@ WEB_ELEMENT_TEXTS = {
                 "male": "muško",
                 "female": "žensko"
             },
-            "label_age": "Starost",
+            "label_age": "Godine",
             "label_chat_history": "Istorija ćaskanja",
             "placeholder_age": "Unesite broj..."
         }
