@@ -4,15 +4,15 @@ This is an AI powered psychological assistant application. The assistant specili
   
 👉 The application is easy to navigate and use.  
 
-👉 The application supports 3 languages - English, Serbia, Russian.  
+👉 The application supports 3 languages - English, Serbian, Russian.  
   
-👉 You can have multiple chats with the assistant and all of them will be stored/persisted in a PostgreSQL database. In case you want to remove any chat from your chat history, you can do it by simply clicking the **Delete chat** button.  
+👉 You can have multiple chats with the assistant and all of them will be stored/persisted in a PostgreSQL database. In case you want to remove any chat from your chat history, you can do it by simply clicking the **DELETE CURRENT CHAT** button.  
 
 👉 The assistant keeps track of a conversation history within each chat so that you can have a human-like conversation with it. 
 
 👉 When you ask the assistant questions, it classifies your questions to topics (stress, depression, anxiety, fear, apathy, or other). When answering the questions, the assistant looks for relevant external data provided to it by the user/admin (e.g. documents on how to deal with stress of your choosing). When a question is classified as 'other', the assistant answers the question based on its own knowledge base. 
   
-The project is split into multiple components/services. The service that is responsible for large language model (LLM) interaction allows to include external data (external for the LLM) when generating answers to your queries. This is called Retrieval-Augmented Generation (RAG). 'External', in this context, means the information that the LLM is not familar with and has not been trained on. In our case, this 'external' information is the psychology-related data stored in txt format that I considered to be the most relevant to the topic of dealing with stress, depression, anxiety, fear, and apathy. This data will be called RAG data throughout this description. RAG data is processed (transformed into numerical vectors) and stored/persisted in a Weaviate vector database.
+The project is split into multiple components/services. The service that is responsible for large language model (LLM) interaction allows to include external data (external for the LLM) when generating answers to your queries. This is called Retrieval-Augmented Generation (RAG). 'External', in this context, means the information that the LLM is not familar with and has not been trained on. In our case, this 'external' information is the psychology-related data stored in txt format that I considered to be the most relevant to the topic of dealing with stress, depression, anxiety, fear, and apathy. This data will be called RAG data throughout this description.
   
 ## User Interface Layout 🖼️
 Here is a basic description of the user interface of the application.
@@ -42,14 +42,14 @@ sudo docker compose -f docker-compose.yml up
 - Wait until all the containers are up and running
 - In order to use RAG data, go to the **./chatbot/data** directory
 - Move the example files to another directory
-- Copy one of the example files back in the **./chatbot/data** directory and run the command below to ingest RAG data (to process it and save it to the vector database). For example, the **managing_fear.txt** file -> topic **fear**:
+- Copy one of the example files back into the **./chatbot/data** directory and run the command below to ingest RAG data (to process it and save it to the vector database). For example, the **managing_fear.txt** file -> topic **fear**:
 ```
 sudo docker exec chatbot python3 ingest.py fear
 ```
 - Repeat the copying step for the remaining files one at a time. Do not forget to pass the relevant topic argument to the command. If you want to, you can use your txt files instead.
 - You may start using the application now  
 
-If you ever need to delete your RAG data from the vector database, run the following command:
+If you ever need to delete RAG data from the vector database, run the following command:
 ```
 sudo docker exec chatbot python3 clear_vector_db.py
 ```
