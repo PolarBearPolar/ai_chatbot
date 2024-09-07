@@ -15,33 +15,43 @@ logger = logging.getLogger(__name__)
 
 
 def retrieveResponse(query: QueryResponseElement, language: str) -> None:
-    logger.info(f"Trying to answer the query:\n\tRAG is enabled: {query.is_rag_used}\n\tlanguage:\n{language}\n\tquery:\n{query.query.chat_message}")
-    if query.is_rag_used:
-        retrieveResponseWithRag(query, language)
-    elif not query.is_rag_used:
-        retrieveResponseWithoutRag(query, language)
+    # Get topic that question is related to first
+    logger.info(f"Trying to answer the query:\n\tRAG is enabled: {query.is_rag_used}\n\tlanguage: {language}\n\tquery:\n{query.query.chat_message}")
+    topicSelectingQuery = helper.generateTopicSelectingQuery(query)
+    retrieveResponseWithoutRag(topicSelectingQuery, language)
+    topic = topicSelectingQuery.response.chat_message.lower()
+    logger.info(f"The topic of the query defined by the LLM: '{topic}'.")
+    # Based on RAG usage and/or topic, route query to function
+    if not query.is_rag_used:
+        logger.info(f"RAG is not enabled in the backend service of the application.")
+        retrieveResponseWithoutRag(query, language, Config.SYSTEM_ROLE)
+    elif helper.isRagUsedByTopic(topic):
+        logger.info(f"The topic uses RAG.")
+        retrieveResponseWithRag(query, language, topic, Config.SYSTEM_ROLE)
+    else:
+        logger.info(f"The topic does not use RAG.")
+        retrieveResponseWithoutRag(query, language, Config.SYSTEM_ROLE) 
 
 
-def retrieveResponseWithRag(query: QueryResponseElement, language: str)-> None:
-    if isVectorDbEmpty():
-        retrieveResponseWithoutRag(query)
-        return
+def retrieveResponseWithRag(query: QueryResponseElement, language: str, topic: str, systemRolePrompt: str=None)-> None:
     helper.configureSettings()
     index = getIndex()
-    chatHistory = [
-        ChatMessage(
-            role=MessageRole.SYSTEM,
-            content=(
-                helper.wrapPromptWithLanguageInstruction(language, Config.SYSTEM_ROLE)
+    chatHistory = []
+    if systemRolePrompt is not None:
+        chatHistory.append(
+            ChatMessage(
+                role=MessageRole.SYSTEM,
+                content=(
+                    helper.wrapPromptWithLanguageInstruction(language, systemRolePrompt)
+                )
             )
         )
-    ]
     if len(query.chat_history) > 0:
         chatHistory.extend(query.getTransformedChatHistory())
     logger.debug(f"Here comes chat history: {chatHistory}")
     for el in chatHistory:
         logger.debug(f" - {str(el)}")
-    queryEngine = getQueryEngine(index, chatHistory, language)
+    queryEngine = getQueryEngine(index, chatHistory, language, topic)
     response = queryEngine.query(query.query.chat_message).response
     query.response = ChatElement(
         chat_id = query.query.chat_id,
@@ -52,16 +62,18 @@ def retrieveResponseWithRag(query: QueryResponseElement, language: str)-> None:
     )
 
 
-def retrieveResponseWithoutRag(query: QueryResponseElement, language: str) -> None:
+def retrieveResponseWithoutRag(query: QueryResponseElement, language: str, systemRolePrompt: str=None) -> None:
     llm = helper.getLlm()
-    chatHistory = [
-        ChatMessage(
-            role=MessageRole.SYSTEM,
-            content=(
-                helper.wrapPromptWithLanguageInstruction(language, Config.SYSTEM_ROLE)
+    chatHistory = []
+    if systemRolePrompt is not None:
+        chatHistory.append(
+            ChatMessage(
+                role=MessageRole.SYSTEM,
+                content=(
+                    helper.wrapPromptWithLanguageInstruction(language, systemRolePrompt)
+                )
             )
         )
-    ]
     if len(query.chat_history) > 0:
         chatHistory.extend(query.getTransformedChatHistory())
     chatHistory.append(
@@ -97,9 +109,10 @@ def getIndex() -> VectorStoreIndex:
     return index
 
 
-def getQueryEngine(index: VectorStoreIndex, chatHistoryMessages: List[ChatMessage], language: str) -> BaseQueryEngine:
+def getQueryEngine(index: VectorStoreIndex, chatHistoryMessages: List[ChatMessage], language: str, topic: str) -> BaseQueryEngine:
     queryEngine = index.as_query_engine(
         llm=helper.getLlm(),
+        filters=helper.getTopicMetadataFilter(topic),
         similarity_top_k=Config.SIMILARITY_TOP_KEY,
         text_qa_template=ChatPromptTemplate(
             chatHistoryMessages + helper.generatePromptTemplate(helper.wrapPromptWithLanguageInstruction(language, Config.TEXT_QA_TEMPLATE_STR), MessageRole.USER)
@@ -120,16 +133,3 @@ def getChatElementResponse(chatElementQuery: ChatElement, response: str, timeTak
         timeTaken=timeTaken
     )
     return chatElementResponse
-
-
-def isVectorDbEmpty() -> bool:
-    client = helper.createWeaviateClient()
-    response = (
-        client.query
-        .get(Config.DOCUMENT_CLASS_NAME, ["file_name"])
-        .do()
-    )
-    storedDocs = response.get("data", {}).get("Get", {}).get(Config.DOCUMENT_CLASS_NAME, [])
-    if len(storedDocs) == 0:
-        return True
-    return False
