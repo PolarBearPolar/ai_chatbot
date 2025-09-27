@@ -6,10 +6,9 @@ services:
     image: chatbot:1.0
     build: 
       context: ./chatbot
-      no_cache: true
       args:
         VECTOR_DATABASE_PORT: 8080
-        LLM: meta-llama/Llama-3-8b-chat-hf
+        LLM: meta-llama/Llama-3.2-3B-Instruct-Turbo
         LLM_API_KEY: '***************************'
         LLM_TEMPERATURE: 0.5
     container_name: chatbot
@@ -28,7 +27,6 @@ services:
     image: backend:1.0
     build: 
       context: ./backend
-      no_cache: true
       args:
         POSTGRES_USER: admin
         POSTGRES_PASSWORD: admin
@@ -53,7 +51,6 @@ services:
     image: frontend:1.0
     build: 
       context: ./frontend
-      no_cache: true
       args:
         BACKEND_PORT: 8000
         DEFAULT_LANGUAGE: en
@@ -109,6 +106,8 @@ services:
       DEFAULT_VECTORIZER_MODULE: 'none'
       ENABLE_MODULES: 'text2vec-cohere,text2vec-huggingface,text2vec-palm,text2vec-openai,generative-openai,generative-cohere,generative-palm,ref2vec-centroid,reranker-cohere,qna-openai'
       CLUSTER_HOSTNAME: 'node1'
+      DISK_USAGE_READONLY_PERCENTAGE: '95'
+      DISK_USE_WARNING_PERCENTAGE: '95'
     networks:
       - net
 

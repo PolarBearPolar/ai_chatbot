@@ -31,6 +31,8 @@ class Config:
 
     # Vector database configuration
     WEAVIATE_URL = f"http://vector_database:{os.environ.get('VECTOR_DATABASE_PORT')}"
+    WEAVIATE_HOST = "vector_database"
+    WEAVIATE_PORT = os.environ.get('VECTOR_DATABASE_PORT')
     WEAVIATE_SCHEMA = {
         "classes": [
             {

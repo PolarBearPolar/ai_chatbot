@@ -45,15 +45,16 @@ def main():
 
 
 def selectNewDocuments(weaviateClient: Client) -> SimpleDirectoryReader:
+    collection = weaviateClient.collections.get(Config.DOCUMENT_CLASS_NAME)
     response = (
-        weaviateClient.query
-        .get(Config.DOCUMENT_CLASS_NAME, ["file_name"])
-        .do()
+        collection.query.fetch_objects(
+            return_properties=["file_name", Config.DOCUMENT_TOPIC_PROPERTY]
+        )
     )
-    storedDocs = response.get("data", {}).get("Get", {}).get(Config.DOCUMENT_CLASS_NAME, [])
+    storedDocs = response.objects
     loadedDocs = set()
     for doc in storedDocs:
-        loadedDocs.add(os.path.basename(doc.get("file_name", None)))
+        loadedDocs.add(os.path.basename(doc.properties.get("file_name", None)))
     if len(loadedDocs) > 0:
         logger.info(f"The following documents have already been ingested before:\t{loadedDocs}")
     docsToUpload = []

@@ -1,13 +1,17 @@
 import constants
-import requests
+# import requests
 import logging
+import aiohttp
 from uvicorn import Config, Server
 from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi.encoders import jsonable_encoder
 from sqlmodel import Session, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from model import ChatElement, User, QueryResponseElement
 from database import getSession
 from sqlalchemy import delete, and_, func
 from typing import Optional
+from helper import getLanguage, sendRequestAsync
 
 # Set up logging
 logging.basicConfig(
@@ -27,106 +31,113 @@ uvicornConfig = Config(
     log_level = "info",
     reload=True
 )
+session: aiohttp.ClientSession | None = None
+    
+@app.on_event("startup")
+async def startupEvent():
+    global session
+    session = aiohttp.ClientSession(timeout = constants.CLIENT_TIMEOUT_CONFIG)
 
-def getLanguage(language: str=None):
-    if language == "en":
-        return "en"
-    elif language == "sr":
-        return "sr"
-    elif language == "ru":
-        return "ru"
-    else:
-        return constants.API_DEFAULT_LANGUAGE
+@app.on_event("shutdown")
+async def shutdownEvent():
+    await session.close()
 
 # Create new user
 @app.post("/user/", response_model=User)
-def createUser(user: User, session: Session=Depends(getSession)):
+async def createUser(user: User, db: AsyncSession=Depends(getSession)):
     statement = select(User).where(and_(User.username == user.username, User.user_password == user.user_password))
-    results = session.exec(statement).all()
+    results = await db.execute(statement)
+    results = results.all()
     if len(results) > 0:
         raise HTTPException(status_code=404, detail="User has already been created.")
-    session.add(user)
-    session.commit()
-    session.refresh(user)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
     return user
 
 # Get existing user by name and password
 @app.get("/user/", response_model=User)
-def getUser(username: str="", password: str="", session: Session=Depends(getSession)):
+async def getUser(username: str="", password: str="", db: AsyncSession=Depends(getSession)):
     statement = select(User).where(and_(User.username == username, User.user_password == password))
-    results = session.exec(statement).all()
-    if len(results) == 0:
+    results = await db.execute(statement)
+    user = results.scalar_one_or_none()
+    if user is None:
         raise HTTPException(status_code=404, detail="User not found.")
-    return results[0]
+    return user
 
 # Get existing user by id
 @app.get("/user/{userId}", response_model=User)
-def getUserById(userId: str, session: Session=Depends(getSession)):
-    dbUser = session.get(User, userId)
+async def getUserById(userId: str, db: AsyncSession=Depends(getSession)):
+    dbUser = await db.get(User, userId)
     if not dbUser:
         raise HTTPException(status_code=404, detail="User not found.")
     return dbUser
 
 # Change existing user information (age, gender)
 @app.put("/user/{userId}", response_model=User)
-def updateUser(userId: str, user: User, session: Session=Depends(getSession)):
-    dbUser = session.get(User, userId)
+async def updateUser(userId: str, user: User, db: AsyncSession=Depends(getSession)):
+    dbUser = await db.get(User, userId)
     if not dbUser:
         raise HTTPException(status_code=404, detail="User not found.")
     dbUser.user_gender = user.user_gender if user.user_gender is not None else dbUser.user_gender
     dbUser.user_age = user.user_age if user.user_age is not None else dbUser.user_age
-    session.add(dbUser)
-    session.commit()
-    session.refresh(dbUser)
+    db.add(dbUser)
+    await db.commit()
+    await db.refresh(dbUser)
     return dbUser
 
 # Create new chat query and response to it
 @app.post("/query/", response_model=Optional[ChatElement])
-def createChatElements(chatElement: ChatElement, session: Session=Depends(getSession), accept_language: str=Header(None)):
+async def createChatElements(chatElement: ChatElement, db: AsyncSession=Depends(getSession), accept_language: str=Header(None)):
     logger.debug(f"Query object: {chatElement}")
     # Get chat history
     chatHistoryStatement = select(ChatElement).where(and_(ChatElement.user_id == chatElement.user_id, ChatElement.chat_id == chatElement.chat_id))
-    chatHistory = [ChatElement(**element.model_dump()) for element in session.exec(chatHistoryStatement).all()]
+    results = await db.execute(chatHistoryStatement)
+    chatHistory = [ChatElement(**dict(element._mapping)) for element in results.all()]
     # Save query chat element to database
-    session.add(chatElement)
-    session.commit()
-    session.refresh(chatElement)
+    db.add(chatElement)
+    await db.commit()
+    await db.refresh(chatElement)
     # Build query object
     query = QueryResponseElement(
         is_rag_used=constants.IS_RAG_USED,
         query=chatElement,
         chat_history=chatHistory
     )
+    logger.debug(f" ***** Request object ***** : {query.json()}")
     # Get response language
     language = getLanguage(accept_language)
     logger.info(f"A new query has been subitted: {query.query.chat_message}")
     # Send query object to chatbot component to get response
-    queryRequest = requests.post(
-        f"{constants.CHATBOT_URL}/query",
+    status, response, error = await sendRequestAsync(
+        session=session, 
+        method="post", 
+        url=f"{constants.CHATBOT_URL}/query", 
         headers={constants.API_HEADER_LANGUAGE: language},
-        data = query.model_dump_json(),
-        timeout=constants.CHATBOT_REQUEST_TIMEOUT
+        body=jsonable_encoder(query.model_dump())
     )
+    logger.info(f"Chatbot response status: {status}, response error (if any): {error}")
     # Save response to database
-    if queryRequest.status_code == 200 and queryRequest.json().get("response", None) is not None and queryRequest.json().get("response").get("chat_message", None) is not None:
-        responseChatElement = ChatElement(**queryRequest.json()["response"])
-        logger.debug(f"Response object: {responseChatElement}")
+    if status == 200 and response is not None and response.get("response", None) is not None and response.get("response").get("chat_message", None) is not None:
+        responseChatElement = ChatElement(**response["response"])
+        logger.debug(f" ***** Response object ***** : {response}")
         logger.info(f"The response to the query is as follows: {responseChatElement.chat_message}")
-        session.add(responseChatElement)
-        session.commit()
-        session.refresh(responseChatElement)
+        db.add(responseChatElement)
+        await db.commit()
+        await db.refresh(responseChatElement)
         return responseChatElement
     return None
 
 # Get all chat elements of one chat for specific user (when userId and chatElementId are specified)
 # Get distinct chats of user (when only userId is specified)
 @app.get("/query/", response_model=list[ChatElement])
-def getUserChatElements(userId: str=None, chatElementId: str=None, session: Session=Depends(getSession)):
+async def getUserChatElements(userId: str=None, chatElementId: str=None, db: AsyncSession=Depends(getSession)):
     if not userId:
         return []
     if  chatElementId is not None:
         statement = select(ChatElement).where(and_(ChatElement.user_id == userId, ChatElement.chat_id == chatElementId)).order_by(ChatElement.created_at)
-        results = session.exec(statement).all()
+        results = await db.execute(statement)
+        results = results.all()
         return results
     else:
         rowNumberFunction = func.row_number().over(partition_by=ChatElement.chat_id, order_by=ChatElement.created_at).label("row_num")
@@ -135,20 +146,22 @@ def getUserChatElements(userId: str=None, chatElementId: str=None, session: Sess
             .subquery()
         )
         statement = select(ChatElement).join(subquery, and_(ChatElement.chat_id==subquery.c.chat_id, ChatElement.created_at==subquery.c.created_at)).where(and_(ChatElement.user_id == userId, subquery.c.row_num == 1))
-        results = session.exec(statement).all()
+        results = await db.execute(statement)
+        results = results.all()
         return results
 
 # Delete chat for specific user
 @app.delete("/query/")
-def deleteChat(userId: str=None, chatElementId: str=None, session: Session=Depends(getSession)):
+async def deleteChat(userId: str=None, chatElementId: str=None, db: AsyncSession=Depends(getSession)):
     if not userId or not chatElementId:
         return None
     statement = select(ChatElement).where(and_(ChatElement.user_id == userId, ChatElement.chat_id == chatElementId))
-    results = session.exec(statement).all()
+    results = await db.execute(statement)
+    results = results.all()
     if len(results) > 0:
         statement = delete(ChatElement).where(and_(ChatElement.user_id == userId, ChatElement.chat_id == chatElementId))
-        session.exec(statement)
-        session.commit()
+        await db.execute(statement)
+        await db.commit()
 
 if __name__ == "__main__":
     server = Server(uvicornConfig)

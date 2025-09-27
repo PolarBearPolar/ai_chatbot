@@ -1,12 +1,15 @@
 import weaviate
+import re
 from llama_index.llms.together import TogetherLLM
 from llama_index.core import Settings
 from llama_index.embeddings.langchain import LangchainEmbedding
 from llama_index.core.llms import ChatMessage
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from llama_index.core.vector_stores import ExactMatchFilter, MetadataFilters
+from weaviate.classes.query import Filter
 from config import Config
 from model import ChatElement, QueryResponseElement
+from contextlib import asynccontextmanager
 
 
 def getLlm() -> TogetherLLM:
@@ -35,10 +38,39 @@ def configureSettings() -> "Settings":
 
 
 def createWeaviateClient() -> weaviate.Client:
-    client = weaviate.Client(Config.WEAVIATE_URL)
-    if not client.schema.exists(class_name=Config.DOCUMENT_CLASS_NAME):
-       client.schema.create(Config.WEAVIATE_SCHEMA)
+    client = weaviate.connect_to_local(
+        host=Config.WEAVIATE_HOST,
+        port=Config.WEAVIATE_PORT   
+    )
+    if not client.collections.exists(Config.DOCUMENT_CLASS_NAME):
+        client.collections.create(
+            name=Config.WEAVIATE_SCHEMA["classes"][0]["class"],
+            description=Config.WEAVIATE_SCHEMA["classes"][0]["description"],
+            vectorizer_config={"vectorizer": "none"},
+            properties=Config.WEAVIATE_SCHEMA["classes"][0]["properties"]
+        )
     return client
+
+
+@asynccontextmanager
+async def createAsyncWeaviateClient():
+    client = weaviate.use_async_with_local(
+        host=Config.WEAVIATE_HOST,
+        port=Config.WEAVIATE_PORT
+    )
+    await client.connect()
+    try:
+        schemaExists = await client.collections.exists(Config.DOCUMENT_CLASS_NAME)
+        if not schemaExists:
+            await client.collections.create(
+                name=Config.WEAVIATE_SCHEMA["classes"][0]["class"],
+                description=Config.WEAVIATE_SCHEMA["classes"][0]["description"],
+                vectorizer_config={"vectorizer": "none"},
+                properties=Config.WEAVIATE_SCHEMA["classes"][0]["properties"]
+            )
+        yield client
+    finally:
+        await client.close()
 
 
 def generatePromptTemplate(templateStr: str, promptRole: str) -> list:
@@ -62,50 +94,67 @@ def getTopicList() -> list:
     return topics
 
 
+def getTopic(response: str) -> str:
+    if response is None:
+        return ""
+    word = ""
+    for i, letter in enumerate(list(response)[::-1]):
+        if re.match("[A-Za-z]", letter):
+            word = letter.lower() + word
+        if not re.match("[A-Za-z]", letter) or len(response) == i+1:
+            if word in getTopicList():
+                return word
+            word = ""
+    return ""
+
+
 def isTopicInTopics(topic: str=None) -> bool:
     if topic is None:
         return False
     return topic in getTopicList()
 
 
-def isVectorDbEmpty() -> bool:
-    client = createWeaviateClient()
-    response = (
-        client.query
-        .get(Config.DOCUMENT_CLASS_NAME, ["file_name"])
-        .do()
-    )
-    storedDocs = response.get("data", {}).get("Get", {}).get(Config.DOCUMENT_CLASS_NAME, [])
-    return len(storedDocs) == 0
+async def isVectorDbEmpty() -> bool:
+    response = None
+    async with createAsyncWeaviateClient() as client:
+        collection = client.collections.get(Config.DOCUMENT_CLASS_NAME)
+        response = (
+            await collection.query.fetch_objects(
+                return_properties=["file_name"]
+            )
+        )
+    if response == None:
+        return True
+    else:
+        return len(response.objects) == 0
 
 
-def isTopicInVectorDb(topic: str=None) -> bool:
+async def isTopicInVectorDb(topic: str=None) -> bool:
     if topic is None:
         return False
-    configureSettings()
-    client = createWeaviateClient()
-    response = (
-        client.query
-        .get(Config.DOCUMENT_CLASS_NAME, ["file_name", Config.DOCUMENT_TOPIC_PROPERTY])
-        .with_where({
-            "path": [Config.DOCUMENT_TOPIC_PROPERTY],
-            "operator": "Equal",
-            "valueText": topic
-        })
-        .with_limit(1)
-        .do()
-    )
-    entries = response.get("data", {}).get("Get", {}).get(Config.DOCUMENT_CLASS_NAME, [])
-    return len(entries)>0
+    response = None
+    async with createAsyncWeaviateClient() as client:
+        collection = client.collections.get(Config.DOCUMENT_CLASS_NAME)
+        response = (
+            await collection.query.fetch_objects(
+                return_properties=["file_name", Config.DOCUMENT_TOPIC_PROPERTY],
+                filters=Filter.by_property(Config.DOCUMENT_TOPIC_PROPERTY).equal(topic),
+                limit=1
+            )
+        )
+    if response is None:
+        return False
+    else:
+        return len(response.objects)>0
 
 
-def isRagUsedByTopic(topic: str=None) -> bool:
+async def isRagUsedByTopic(topic: str=None) -> bool:
     if topic is None:
         return False
     for confTopic in Config.TOPICS:
         if topic == confTopic["topic"]:
             if confTopic["is_rag_used"]:
-                return isTopicInVectorDb(topic)
+                return await isTopicInVectorDb(topic)
     return False
 
 
@@ -138,4 +187,3 @@ def getTopicMetadataFilter(topic: str) -> MetadataFilters:
             ExactMatchFilter(key=Config.DOCUMENT_TOPIC_PROPERTY, value=topic)
         ]
     )
-

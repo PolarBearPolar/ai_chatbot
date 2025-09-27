@@ -15,6 +15,8 @@ RUN mkdir chatbot
 WORKDIR ./chatbot
 
 COPY ./requirements.txt .
+COPY ./run_chatbot.sh .
+RUN chmod +x run_chatbot.sh
 
 RUN apt-get update && \
 	apt-get upgrade -y && \
