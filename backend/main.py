@@ -47,7 +47,7 @@ async def shutdownEvent():
 async def createUser(user: User, db: AsyncSession=Depends(getSession)):
     statement = select(User).where(and_(User.username == user.username, User.user_password == user.user_password))
     results = await db.execute(statement)
-    results = results.all()
+    results = results.scalars().all()
     if len(results) > 0:
         raise HTTPException(status_code=404, detail="User has already been created.")
     db.add(user)
@@ -93,7 +93,7 @@ async def createChatElements(chatElement: ChatElement, db: AsyncSession=Depends(
     # Get chat history
     chatHistoryStatement = select(ChatElement).where(and_(ChatElement.user_id == chatElement.user_id, ChatElement.chat_id == chatElement.chat_id))
     results = await db.execute(chatHistoryStatement)
-    chatHistory = [ChatElement(**dict(element._mapping)) for element in results.all()]
+    chatHistory = results.scalars().all()
     # Save query chat element to database
     db.add(chatElement)
     await db.commit()
@@ -102,7 +102,7 @@ async def createChatElements(chatElement: ChatElement, db: AsyncSession=Depends(
     query = QueryResponseElement(
         is_rag_used=constants.IS_RAG_USED,
         query=chatElement,
-        chat_history=chatHistory
+        chat_history=jsonable_encoder(chatHistory)
     )
     logger.debug(f" ***** Request object ***** : {query.json()}")
     # Get response language
@@ -137,7 +137,7 @@ async def getUserChatElements(userId: str=None, chatElementId: str=None, db: Asy
     if  chatElementId is not None:
         statement = select(ChatElement).where(and_(ChatElement.user_id == userId, ChatElement.chat_id == chatElementId)).order_by(ChatElement.created_at)
         results = await db.execute(statement)
-        results = results.all()
+        results = results.scalars().all()
         return results
     else:
         rowNumberFunction = func.row_number().over(partition_by=ChatElement.chat_id, order_by=ChatElement.created_at).label("row_num")
@@ -147,7 +147,7 @@ async def getUserChatElements(userId: str=None, chatElementId: str=None, db: Asy
         )
         statement = select(ChatElement).join(subquery, and_(ChatElement.chat_id==subquery.c.chat_id, ChatElement.created_at==subquery.c.created_at)).where(and_(ChatElement.user_id == userId, subquery.c.row_num == 1))
         results = await db.execute(statement)
-        results = results.all()
+        results = results.scalars().all()
         return results
 
 # Delete chat for specific user
@@ -157,7 +157,7 @@ async def deleteChat(userId: str=None, chatElementId: str=None, db: AsyncSession
         return None
     statement = select(ChatElement).where(and_(ChatElement.user_id == userId, ChatElement.chat_id == chatElementId))
     results = await db.execute(statement)
-    results = results.all()
+    results = results.scalars().all()
     if len(results) > 0:
         statement = delete(ChatElement).where(and_(ChatElement.user_id == userId, ChatElement.chat_id == chatElementId))
         await db.execute(statement)

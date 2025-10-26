@@ -43,6 +43,16 @@ class Config:
                         "name": "content",
                         "dataType": ["text"],
                         "description": "Text content for the document",
+                    },
+                    {
+                        "name": "topic",
+                        "dataType": ["text"],
+                        "description": "Topic of the document",
+                    },
+                    {
+                        "name": "file_name",
+                        "dataType": ["text"],
+                        "description": "Filename",
                     }
                 ],
             },
@@ -66,6 +76,14 @@ class Config:
     LLM_REQUEST_TIMEOUT = 20000
     LLM_TEMPERATURE = __getFloatLlmTemperature(os.environ.get("LLM_TEMPERATURE"))
     SIMILARITY_TOP_KEY = 10
+    LLM_RETRY_ATTEMPTS = 5
+    LLM_RETRY_MIN_WAIT = 1
+    LLM_RETRY_MAX_WAIT = 10
+    LLM_ERROR_MESSAGE = {
+        "en": "Oops! There seems to have been an error while answering your query... Please try again later!", 
+        "sr": "Ups! Čini se da je došlo do greške prilikom obrade vašeg zahteva... Molimo vas, pokušajte ponovo kasnije!",
+        "ru": "Упс! Похоже, произошла ошибка при обработке вашего запроса... Пожалуйста, попробуйте позже!"
+    }
 
     # Topic configuration
     TOPICS = [
@@ -80,7 +98,7 @@ class Config:
     Here is a list of available topics:
     {topics}
     You have a chat history provided below. Considering the chat history, please choose one topic out of the \
-    list of the available topics that describes it. Only output one word (the topic name) and nothing else.
+    list of the available topics that describes it. Only output one word (the topic name strictly from the list of available topics) and nothing else.
     {chat_history}
     """
 

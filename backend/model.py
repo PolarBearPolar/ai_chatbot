@@ -16,7 +16,7 @@ def getCurrTimestamp():
 
 
 class User(SQLModel, table=True):
-    user_id: Optional[str] = Field(default_factory=generateUuidHex, primary_key=True)
+    user_id: str = Field(default_factory=generateUuidHex, primary_key=True)
     username: Optional[str] = Field(default="")
     user_password: Optional[str] = Field(default="")
     user_gender: Optional[str] = Field(default=None)
@@ -25,22 +25,18 @@ class User(SQLModel, table=True):
 
     __table_args__ = (
         UniqueConstraint("username", "user_password", name="username_password_uk"),
-    )
+   )
 
 
 class ChatElement(SQLModel, table=True):
-    chat_id: Optional[str] = Field(default_factory=generateUuidHex)
-    chat_role: Optional[str] = Field(default="")
+    chat_id: str = Field(default_factory=generateUuidHex, primary_key=True)
+    chat_role: Optional[str] = Field(default="", primary_key=True)
+    created_at: datetime = Field(default_factory=getCurrTimestamp, primary_key=True)
     chat_message: Optional[str] = Field(default="", sa_column=Column(TEXT))
-    created_at: datetime = Field(default_factory=getCurrTimestamp)
     user_id: Optional[str] = Field(default=None, foreign_key="user.user_id")
     user: User | None = Relationship(back_populates="chats")
 
     __tablename__ = "chat_history"
-
-    __table_args__ = (
-        PrimaryKeyConstraint("chat_id", "chat_role", "created_at", name="chat_pk"),
-    )
 
 
 class QueryResponseElement(BaseModel):

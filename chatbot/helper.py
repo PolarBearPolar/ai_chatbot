@@ -7,26 +7,34 @@ from llama_index.core.llms import ChatMessage
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from llama_index.core.vector_stores import ExactMatchFilter, MetadataFilters
 from weaviate.classes.query import Filter
+from weaviate.collections.classes.config import Configure
+from weaviate.classes.config import Property, DataType
 from config import Config
 from model import ChatElement, QueryResponseElement
 from contextlib import asynccontextmanager
 
+_llm = None
+_embeddingModel = None
 
 def getLlm() -> TogetherLLM:
-    llm = TogetherLLM(
-        model=Config.LLM, 
-        api_key=Config.LLM_API_KEY,
-        request_timeout=Config.LLM_REQUEST_TIMEOUT, 
-        temperature=Config.LLM_TEMPERATURE
-    )
-    return llm
+    global _llm
+    if _llm is None:
+        _llm = TogetherLLM(
+            model=Config.LLM, 
+            api_key=Config.LLM_API_KEY,
+            request_timeout=Config.LLM_REQUEST_TIMEOUT, 
+            temperature=Config.LLM_TEMPERATURE
+        )
+    return _llm
 
 
 def getEmbeddingModdel() -> LangchainEmbedding:
-    embeddingModel = LangchainEmbedding(
-        HuggingFaceEmbeddings(model_name=Config.EMBEDDING_MODEL)
-    )
-    return embeddingModel
+    global _embeddingModel
+    if _embeddingModel is None:
+        _embeddingModel = LangchainEmbedding(
+            HuggingFaceEmbeddings(model_name=Config.EMBEDDING_MODEL)
+        )
+    return _embeddingModel
 
 
 def configureSettings() -> "Settings":
@@ -65,8 +73,11 @@ async def createAsyncWeaviateClient():
             await client.collections.create(
                 name=Config.WEAVIATE_SCHEMA["classes"][0]["class"],
                 description=Config.WEAVIATE_SCHEMA["classes"][0]["description"],
-                vectorizer_config={"vectorizer": "none"},
-                properties=Config.WEAVIATE_SCHEMA["classes"][0]["properties"]
+                vectorizer_config=Configure.Vectorizer.none(),
+                properties=[
+                    Property(name=prop["name"], data_type=DataType.TEXT, description=prop.get("description", ""))
+                    for prop in Config.WEAVIATE_SCHEMA["classes"][0]["properties"]
+                ]
             )
         yield client
     finally:

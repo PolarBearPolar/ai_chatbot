@@ -10,16 +10,35 @@ from typing import List
 from config import Config
 from model import ChatElement, QueryResponseElement
 from datetime import datetime, timezone
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
 
 
 logger = logging.getLogger(__name__)
 
+async def onFailure(retry_state) -> None:
+    query = retry_state.kwargs.get("query")
+    query.response = ChatElement(
+        chat_id = query.query.chat_id,
+        chat_role = Config.LLM_ROLE_ASSISTANT,
+        chat_message = Config.LLM_ERROR_MESSAGE.get(retry_state.kwargs.get("language"), "Sorry, bro"),
+        created_at = datetime.now(timezone.utc),
+        user_id = query.query.user_id
+    )
+    logger.error(f"Exception: {type(retry_state.outcome.exception()).__name__}: {retry_state.outcome.exception()}")
 
+
+@retry(
+    stop=stop_after_attempt(Config.LLM_RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=1, min=Config.LLM_RETRY_MIN_WAIT, max=Config.LLM_RETRY_MAX_WAIT),
+    retry_error_callback=onFailure,
+    before_sleep=before_sleep_log(logger, logging.WARNING)
+)
 async def retrieveResponse(query: QueryResponseElement, language: str) -> None:
     # Get topic that question is related to first
     logger.info(f"Trying to answer the query:\n\tRAG is enabled: {query.is_rag_used}\n\tlanguage: {language}\n\tquery:\n{query.query.chat_message}")
     topicSelectingQuery = helper.generateTopicSelectingQuery(query)
     await retrieveResponseWithoutRag(topicSelectingQuery, language)
+    logger.info(f"The full message about the topic of the query: {topicSelectingQuery}")
     topic = helper.getTopic(topicSelectingQuery.response.chat_message)
     logger.info(f"The topic of the query defined by the LLM: '{topic}'.")
     # Based on RAG usage and/or topic, route query to function
@@ -34,7 +53,7 @@ async def retrieveResponse(query: QueryResponseElement, language: str) -> None:
         await retrieveResponseWithoutRag(query, language, Config.SYSTEM_ROLE)
 
 
-async def retrieveResponseWithRag(query: QueryResponseElement, language: str, topic: str, systemRolePrompt: str=None)-> None:
+async def retrieveResponseWithRag(query: QueryResponseElement, language: str, topic: str, systemRolePrompt: str=None) -> None:
     helper.configureSettings()
     async with helper.createAsyncWeaviateClient() as client:
         index = await getIndex(client)
